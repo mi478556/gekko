@@ -1,8 +1,8 @@
 const config = require('./vue/dist/UIconfig');
 
-const koa = require('koa');
+const Koa = require('koa');
 const serve = require('koa-static');
-const cors = require('koa-cors');
+const cors = require('@koa/cors');
 const _ = require('lodash');
 const bodyParser = require('koa-bodyparser');
 
@@ -10,7 +10,7 @@ const opn = require('opn');
 const server = require('http').createServer();
 const router = require('koa-router')();
 const ws = require('ws');
-const app = koa();
+const app = new Koa(); // Use new keyword here
 
 const WebSocketServer = require('ws').Server;
 const wss = new WebSocketServer({ server: server });
@@ -31,11 +31,10 @@ wss.on('connection', ws => {
   });
 });
 
-
 setInterval(() => {
   wss.clients.forEach(ws => {
-    if(!ws.isAlive) {
-      console.log(new Date, '[WS] stale websocket client, terminiating..');
+    if (!ws.isAlive) {
+      console.log(new Date, '[WS] stale websocket client, terminating..');
       return ws.terminate();
     }
 
@@ -46,7 +45,7 @@ setInterval(() => {
 
 // broadcast function
 const broadcast = data => {
-  if(_.isEmpty(data)) {
+  if (_.isEmpty(data)) {
     return;
   }
 
@@ -54,15 +53,13 @@ const broadcast = data => {
 
   wss.clients.forEach(ws => {
     ws.send(payload, err => {
-      if(err) {
+      if (err) {
         console.log(new Date, '[WS] unable to send data to client:', err);
       }
     });
-  }
-  );
+  });
 }
 cache.set('broadcast', broadcast);
-
 
 const ListManager = require('./state/listManager');
 const GekkoManager = require('./state/gekkoManager');
@@ -84,9 +81,9 @@ router.get('/api/strategies', require(ROUTE('strategies')));
 router.get('/api/configPart/:part', require(ROUTE('configPart')));
 router.get('/api/apiKeys', apiKeys.get);
 
-const listWraper = require(ROUTE('list'));
-router.get('/api/imports', listWraper('imports'));
-router.get('/api/gekkos', listWraper('gekkos'));
+const listWrapper = require(ROUTE('list'));
+router.get('/api/imports', listWrapper('imports'));
+router.get('/api/gekkos', listWrapper('gekkos'));
 router.get('/api/exchanges', require(ROUTE('exchanges')));
 
 router.post('/api/addApiKey', apiKeys.add);
@@ -99,12 +96,6 @@ router.post('/api/startGekko', require(ROUTE('startGekko')));
 router.post('/api/stopGekko', require(ROUTE('stopGekko')));
 router.post('/api/deleteGekko', require(ROUTE('deleteGekko')));
 router.post('/api/getCandles', require(ROUTE('getCandles')));
-
-
-// incoming WS:
-// wss.on('connection', ws => {
-//   ws.on('message', _.noop);
-// });
 
 app
   .use(cors())
@@ -119,21 +110,21 @@ server.on('request', app.callback());
 server.listen(config.api.port, config.api.host, '::', () => {
   const host = `${config.ui.host}:${config.ui.port}${config.ui.path}`;
 
-  if(config.ui.ssl) {
-    var location = `https://${host}`;
+  let location;
+  if (config.ui.ssl) {
+    location = `https://${host}`;
   } else {
-    var location = `http://${host}`;
+    location = `http://${host}`;
   }
 
-  console.log('Serving Gekko UI on ' + location +  '\n');
-
+  console.log('Serving Gekko UI on ' + location + '\n');
 
   // only open a browser when running `node gekko`
   // this prevents opening the browser during development
-  if(!isDevServer && !config.headless) {
+  if (!isDevServer && !config.headless) {
     opn(location)
       .catch(err => {
         console.log('Something went wrong when trying to open your web browser. UI is running on ' + location + '.');
-    });
+      });
   }
 });

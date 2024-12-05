@@ -10,12 +10,12 @@ const base = require('./baseConfig');
 
 // starts an import
 // requires a post body with a config object
-module.exports = function *() {
+module.exports = async (ctx) => {
   let mode = 'importer';
 
-  let config = {}
+  let config = {};
 
-  _.merge(config, base, this.request.body);
+  _.merge(config, base, ctx.request.body);
 
   let importId = (Math.random() + '').slice(3);
 
@@ -24,10 +24,9 @@ module.exports = function *() {
   console.log('Import', importId, 'started');
 
   pipelineRunner(mode, config, (err, event) => {
-    if(errored)
-      return;
+    if (errored) return;
 
-    if(err) {
+    if (err) {
       errored = true;
       console.error('RECEIVED ERROR IN IMPORT', importId);
       console.error(err);
@@ -39,8 +38,7 @@ module.exports = function *() {
       });
     }
 
-    if(!event)
-      return;
+    if (!event) return;
 
     // update local cache
     importManager.update(importId, {
@@ -56,11 +54,11 @@ module.exports = function *() {
         latest: event.latest,
         done: event.done
       }
-    }
+    };
     broadcast(wsEvent);
   });
 
-  let daterange = this.request.body.importer.daterange;
+  let daterange = ctx.request.body.importer.daterange;
 
   const _import = {
     watch: config.watch,
@@ -68,8 +66,8 @@ module.exports = function *() {
     latest: '',
     from: daterange.from,
     to: daterange.to
-  }
+  };
 
   importManager.add(_import);
-  this.body = _import;
-}
+  ctx.body = _import;
+};

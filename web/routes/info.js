@@ -1,8 +1,8 @@
 const p = require('../../package.json');
 
 // Retrieves API information
-module.exports = function *() {
-  this.body = {
+module.exports = async (ctx) => {
+  ctx.body = {
     version: p.version
-  }
-}
+  };
+};

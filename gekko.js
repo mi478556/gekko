@@ -39,9 +39,10 @@ console.log('\tI\'m gonna make you rich, Bud Fox.', '\n\n');
 
 const dirs = util.dirs();
 
-if(util.launchUI()) {
-  return require(util.dirs().web + 'server');
-}
+// if(util.launchUI()) {
+//   return require(util.dirs().web + 'server');
+// }
+return require(util.dirs().web + 'server');
 
 const pipeline = require(dirs.core + 'pipeline');
 const config = util.getConfig();

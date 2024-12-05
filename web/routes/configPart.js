@@ -1,5 +1,5 @@
 const _ = require('lodash');
-const fs = require('co-fs');
+const fs = require('fs').promises; // Use fs.promises for async/await support
 
 const parts = {
   paperTrader: 'config/plugins/paperTrader',
@@ -9,12 +9,21 @@ const parts = {
 
 const gekkoRoot = __dirname + '/../../';
 
-module.exports = function *() {
-  if(!_.has(parts, this.params.part))
-    return this.body = 'error :(';
+module.exports = async (ctx) => {
+  if(!_.has(parts, ctx.params.part)) {
+    ctx.body = 'error :(';
+    return;
+  }
 
-  const fileName = gekkoRoot + '/' + parts[this.params.part] + '.toml';
-  this.body = {
-    part: yield fs.readFile(fileName, 'utf8') 
+  const fileName = gekkoRoot + '/' + parts[ctx.params.part] + '.toml';
+  try {
+    const partContent = await fs.readFile(fileName, 'utf8');
+    ctx.body = {
+      part: partContent
+    }
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Internal Server Error' };
+    console.error('Error reading file:', error);
   }
 }

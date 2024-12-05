@@ -1,5 +1,5 @@
 const _ = require('lodash');
-const fs = require('co-fs');
+const fs = require('fs').promises; // Use fs.promises for async/await support
 
 const gekkoRoot = __dirname + '/../../';
 var util = require(__dirname + '/../../core/util');
@@ -11,29 +11,35 @@ config.silent = false;
 
 util.setConfig(config);
 
-module.exports = function *() {
-  const exchangesDir = yield fs.readdir(gekkoRoot + 'exchange/wrappers/');
-  const exchanges = exchangesDir
-    .filter(f => _.last(f, 3).join('') === '.js')
-    .map(f => f.slice(0, -3));
+module.exports = async (ctx) => {
+  try {
+    const exchangesDir = await fs.readdir(gekkoRoot + 'exchange/wrappers/');
+    const exchanges = exchangesDir
+      .filter(f => f.endsWith('.js')) // Use endsWith to filter .js files
+      .map(f => f.slice(0, -3));
 
-  let allCapabilities = [];
+    let allCapabilities = [];
 
-  exchanges.forEach(function (exchange) {
-    let Trader = null;
+    for (const exchange of exchanges) {
+      let Trader = null;
 
-    try {
-      Trader = require(gekkoRoot + 'exchange/wrappers/' + exchange);
-    } catch (e) {
-      return;
+      try {
+        Trader = require(gekkoRoot + 'exchange/wrappers/' + exchange);
+      } catch (e) {
+        continue;
+      }
+
+      if (!Trader || !Trader.getCapabilities) {
+        continue;
+      }
+
+      allCapabilities.push(Trader.getCapabilities());
     }
 
-    if (!Trader || !Trader.getCapabilities) {
-      return;
-    }
-
-    allCapabilities.push(Trader.getCapabilities());
-  });
-
-  this.body = allCapabilities;
-}
+    ctx.body = allCapabilities;
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Internal Server Error' };
+    console.error('Error in /api/exchanges route:', error);
+  }
+};

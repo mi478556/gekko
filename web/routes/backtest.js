@@ -1,5 +1,3 @@
-// simple POST request that returns the backtest result
-
 const _ = require('lodash');
 const promisify = require('tiny-promisify');
 const pipelineRunner = promisify(require('../../core/workers/pipeline/parent'));
@@ -16,16 +14,22 @@ const pipelineRunner = promisify(require('../../core/workers/pipeline/parent'));
 //     roundtrips: true
 //   }
 // }
-module.exports = function *() {
+module.exports = async (ctx) => {
   var mode = 'backtest';
 
   var config = {};
 
   var base = require('./baseConfig');
 
-  var req = this.request.body;
+  var req = ctx.request.body;
 
   _.merge(config, base, req);
 
-  this.body = yield pipelineRunner(mode, config);
-}
+  try {
+    ctx.body = await pipelineRunner(mode, config);
+  } catch (error) {
+    ctx.status = 500;
+    ctx.body = { error: 'Internal Server Error' };
+    console.error('Error in /api/backtest route:', error);
+  }
+};

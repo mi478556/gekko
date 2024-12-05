@@ -49,7 +49,7 @@ config.sqlite = {
   journalMode: require('../isWindows.js') ? 'PERSIST' : 'WAL',
   dependencies: [{
     module: 'sqlite3',
-    version: '3.1.4'
+    version: '5.1.7'
   }]
 }
 
