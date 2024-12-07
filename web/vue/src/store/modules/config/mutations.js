@@ -1,11 +1,9 @@
-import Vue from 'vue'
-
 export const syncApiKeys = (state, apiKeys) => {
-  Vue.set(state, 'apiKeys', apiKeys);
+  state.apiKeys = apiKeys; // Direct assignment
   return state;
-}
+};
 
 export const syncExchanges = (state, exchanges) => {
-  Vue.set(state, 'exchanges', exchanges);
+  state.exchanges = exchanges; // Direct assignment
   return state;
-}
+};

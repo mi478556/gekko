@@ -1,24 +1,22 @@
-import Vue from 'vue'
-import Vuex from 'vuex'
-import _ from 'lodash'
+import { createApp } from 'vue';
+import { createStore } from 'vuex';
+import _ from 'lodash';
 
-import * as importMutations from './modules/imports/mutations'
-import * as gekkoMutations from './modules/gekkos/mutations'
-import * as notificationMutations from './modules/notifications/mutations'
-import * as configMutations from './modules/config/mutations'
+// Import mutation modules
+import * as importMutations from './modules/imports/mutations';
+import * as gekkoMutations from './modules/gekkos/mutations';
+import * as notificationMutations from './modules/notifications/mutations';
+import * as configMutations from './modules/config/mutations';
 
-Vue.use(Vuex);
-
-const debug = process.env.NODE_ENV !== 'production'
-
+// Merge mutations
 let mutations = {};
-
 _.merge(mutations, importMutations);
 _.merge(mutations, gekkoMutations);
 _.merge(mutations, notificationMutations);
 _.merge(mutations, configMutations);
 
-export default new Vuex.Store({
+// Create the Vuex store
+const store = createStore({
   state: {
     warnings: {
       connected: true, // assume we will connect
@@ -28,11 +26,13 @@ export default new Vuex.Store({
     archivedGekkos: {},
     connection: {
       disconnected: false,
-      reconnected: false
+      reconnected: false,
     },
     apiKeys: [],
-    exchanges: {}
+    exchanges: {},
   },
   mutations,
-  strict: debug
-})
+  strict: process.env.NODE_ENV !== 'production',
+});
+
+export default store;

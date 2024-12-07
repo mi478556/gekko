@@ -1,15 +1,16 @@
-import store from '../../'
-import { bus } from '../../../components/global/ws'
+import store from '../../';
+import { bus } from '../../../components/global/ws';
 
-const init = () => {}
+const init = () => {};
 
 const sync = () => {
-  bus.$on('WS_STATUS_CHANGE', ws => {
-    return store.commit('setGlobalWarning', {key: 'connected', value: ws.connected});
+  // Replace $on with on for mitt
+  bus.on('WS_STATUS_CHANGE', (ws) => {
+    store.commit('setGlobalWarning', { key: 'connected', value: ws.connected });
   });
-}
+};
 
-export default function() {
+export default function () {
   init();
   sync();
 }
