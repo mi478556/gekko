@@ -42,7 +42,7 @@ if(to <= from)
   util.die('This daterange does not make sense.')
 
 var Market = function() {
-  _.bindAll(this);
+  _.bindAll(this, 'processTrades', 'pushCandles', 'get');
   this.exchangeSettings = exchangeChecker.settings(config.watch);
 
   this.tradeBatcher = new TradeBatcher(this.exchangeSettings.tid);

@@ -12,7 +12,18 @@ const log = require(dirs.core + 'log');
 const TrailingStop = require(dirs.broker + 'triggers/trailingStop');
 
 const PaperTrader = function() {
-  _.bindAll(this);
+  _.bindAll(this, 'relayPortfolioChange', 
+                  'relayPortfolioValueChange', 
+                  'extractFee', 
+                  'setStartBalance', 
+                  'updatePosition', 
+                  'getBalance', 
+                  'now', 
+                  'processAdvice', 
+                  'createTrigger', 
+                  'onStopTrigger', 
+                  'processStratWarmupCompleted', 
+                  'processCandle');
 
   if(calcConfig.feeUsing === 'maker') {
     this.rawFee = calcConfig.feeMaker;

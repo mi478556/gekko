@@ -13,7 +13,7 @@ const dirs = util.dirs();
 
 const Manager = function(config) {
 
-  _.bindAll(this);
+  _.bindAll(this, 'retrieve', 'relayTrades');
 
   // fetch trades
   this.source = new MarketFetcher(config);

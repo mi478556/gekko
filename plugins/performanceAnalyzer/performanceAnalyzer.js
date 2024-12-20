@@ -14,7 +14,16 @@ const watchConfig = config.watch;
 const Logger = require('./logger');
 
 const PerformanceAnalyzer = function() {
-  _.bindAll(this);
+  _.bindAll(this, 'processPortfolioValueChange', 
+                  'processPortfolioChange', 
+                  'processStratWarmupCompleted', 
+                  'processCandle', 
+                  'emitRoundtripUpdate', 
+                  'processTradeCompleted', 
+                  'registerRoundtripPart', 
+                  'handleCompletedRoundtrip', 
+                  'calculateReportStatistics', 
+                  'finalize');
 
   this.dates = {
     start: false,

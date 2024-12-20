@@ -23,7 +23,7 @@ if(!to.isValid())
 
 var Market = function() {
 
-  _.bindAll(this);
+  _.bindAll(this, 'get', 'processCandles');
   this.pushing = false;
   this.ended = false;
   this.closed = false;

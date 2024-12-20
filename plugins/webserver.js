@@ -4,7 +4,7 @@ var _ = require('lodash');
 var Server = require('../web/server.js');
 
 var Actor = function(next) {
-  _.bindAll(this);
+  _.bindAll(this, 'init', 'processCandle', 'processAdvice');
 
   this.server = new Server();
   this.server.setup(next);

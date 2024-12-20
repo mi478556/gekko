@@ -7,7 +7,7 @@ var sqlite = require('./handle');
 var sqliteUtil = require('./util');
 
 var Reader = function() {
-  _.bindAll(this);
+  _.bindAll(this, 'mostRecentWindow', 'tableExists', 'get', 'count', 'countTotal', 'getBoundry', 'close');
   this.db = sqlite.initDB(true);
 }
 

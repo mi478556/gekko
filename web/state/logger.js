@@ -10,7 +10,7 @@ const Logger = function(id) {
   this.writing = false;
   this.queue = [];
 
-  _.bindAll(this);
+  _.bindAll(this, 'write', 'handleWriteCallback');
 }
 
 Logger.prototype.write = function(line) {

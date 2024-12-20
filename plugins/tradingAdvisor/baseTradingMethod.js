@@ -28,7 +28,17 @@ _.each(indicatorFiles, function(indicator) {
 const allowedIndicators = _.keys(Indicators);
 
 var Base = function(settings) {
-  _.bindAll(this);
+  _.bindAll(this, 'tick', 
+                  'isBusy', 
+                  'calculateSyncIndicators', 
+                  'propogateTick', 
+                  'processTrade', 
+                  'addTalibIndicator', 
+                  'addTulipIndicator', 
+                  'addIndicator', 
+                  'advice', 
+                  'notify', 
+                  'finish');
 
   // properties
   this.age = 0;

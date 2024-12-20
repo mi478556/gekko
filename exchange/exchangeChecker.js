@@ -4,7 +4,7 @@ const moment = require('moment');
 const errors = require('./exchangeErrors');
 
 const Checker = function() {
-  _.bindAll(this);
+  _.bindAll(this, 'cantMonitor', 'cantFetchFullHistory', 'cantTrade', 'settings');
 }
 
 Checker.prototype.getExchangeCapabilities = function(slug) {

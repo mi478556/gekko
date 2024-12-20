@@ -8,7 +8,21 @@ const scientificToDecimal = exchangeUtils.scientificToDecimal;
 const marketData = require('./kraken-markets.json');
 
 const Trader = function(config) {
-  _.bindAll(this);
+  _.bindAll(this, 'handleResponse', 
+                  'getTrades', 
+                  'getPortfolio', 
+                  'getFee', 
+                  'getTicker', 
+                  'roundAmount', 
+                  'roundPrice', 
+                  'addOrder', 
+                  'buy', 
+                  'sell', 
+                  'getOrder', 
+                  'checkOrder', 
+                  'cancelOrder', 
+                  'getRawOpenOrders', 
+                  'getOpenOrders');
 
   if(_.isObject(config)) {
     this.key = config.key;

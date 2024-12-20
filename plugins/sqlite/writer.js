@@ -6,19 +6,19 @@ var sqliteUtil = require('./util');
 var util = require('../../core/util');
 var log = require('../../core/log');
 
-var Store = function(done, pluginMeta) {
+var Store = function (done, pluginMeta) {
   _.bindAll(this);
   this.done = done;
 
   this.db = sqlite.initDB(false);
-  this.upsertTables().then(done).catch(util.die);
+  this.db.serialize(() => this.upsertTables());
 
   this.cache = [];
   this.buffered = util.gekkoMode() === "importer";
-};
+}
 
-Store.prototype.upsertTables = async function() {
-  const createQueries = [
+Store.prototype.upsertTables = function () {
+  var createQueries = [
     `
       CREATE TABLE IF NOT EXISTS
       ${sqliteUtil.table('candles')} (
@@ -32,41 +32,41 @@ Store.prototype.upsertTables = async function() {
         volume REAL NOT NULL,
         trades INTEGER NOT NULL
       );
-    `
+    `,
+
     // TODO: create trades
     // ``
 
     // TODO: create advices
     // ``
   ];
+  
+  var next = _.after(_.size(createQueries), this.done);
 
-  try {
-    await this.db.run('BEGIN TRANSACTION');
+  _.each(createQueries, (q) => {
+    this.db.run(q, next);
+  });
+}
 
-    for (const query of createQueries) {
-      await this.db.run(query);
-    }
+Store.prototype.writeCandles = function () {
+  if (_.isEmpty(this.cache))
+    return;
 
-    await this.db.run('COMMIT');
-  } catch (error) {
-    await this.db.run('ROLLBACK');
-    throw error;
-  }
-};
+  const transaction = () => {
+    this.db.run("BEGIN TRANSACTION");
 
-Store.prototype.writeCandles = async function() {
-  if (_.isEmpty(this.cache)) return;
-
-  try {
-    await this.db.run('BEGIN TRANSACTION');
-
-    const stmt = await this.db.prepare(`
+    var stmt = this.db.prepare(`
       INSERT OR IGNORE INTO ${sqliteUtil.table('candles')}
       VALUES (?,?,?,?,?,?,?,?,?)
-    `);
+    `, (err, rows) => {
+      if (err) {
+        log.error(err);
+        return util.die('DB error at INSERT: ' + err);
+      }
+    });
 
-    for (const candle of this.cache) {
-      await stmt.run(
+    _.each(this.cache, candle => {
+      stmt.run(
         null,
         candle.start.unix(),
         candle.open,
@@ -77,37 +77,34 @@ Store.prototype.writeCandles = async function() {
         candle.volume,
         candle.trades
       );
-    }
+    });
 
-    await stmt.finalize();
-    await this.db.run('COMMIT');
+    stmt.finalize();
+    this.db.run("COMMIT");
     // TEMP: should fix https://forum.gekko.wizb.it/thread-57279-post-59194.html#pid59194
-    await this.db.run('pragma wal_checkpoint;');
+    this.db.run("pragma wal_checkpoint;");
 
     this.cache = [];
-  } catch (error) {
-    await this.db.run('ROLLBACK');
-    log.error('DB error at INSERT:', error);
-    throw error;
   }
-};
 
-var processCandle = function(candle, done) {
+  this.db.serialize(transaction);
+}
+
+var processCandle = function (candle, done) {
   this.cache.push(candle);
-  if (!this.buffered || this.cache.length > 1000) 
-    this.writeCandles().then(done).catch(util.die);
-  else
-    done();
+  if (!this.buffered || this.cache.length > 1000)
+    this.writeCandles();
+
+  done();
 };
 
-var finalize = function(done) {
-  this.writeCandles().then(() => {
-    this.db.close(done);
-    this.db = null;
-  }).catch(util.die);
-};
+var finalize = function (done) {
+  this.writeCandles();
+  this.db.close(() => { done(); });
+  this.db = null;
+}
 
-if(config.candleWriter.enabled) {
+if (config.candleWriter.enabled) {
   Store.prototype.processCandle = processCandle;
   Store.prototype.finalize = finalize;
 }

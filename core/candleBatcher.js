@@ -20,7 +20,7 @@ var CandleBatcher = function(candleSize) {
   this.smallCandles = [];
   this.calculatedCandles = [];
 
-  _.bindAll(this);
+  _.bindAll(this, 'write', 'check', 'flush', 'calculate');
 }
 
 util.makeEventEmitter(CandleBatcher);

@@ -11,7 +11,15 @@ require(dirs.gekko + '/exchange/dependencyCheck');
 
 const Trader = function(next) {
 
-  _.bindAll(this);
+  _.bindAll(this, 'relayPortfolioChange', 
+                  'relayPortfolioValueChange', 
+                  'setPortfolio', 
+                  'setBalance', 
+                  'processCandle', 
+                  'processAdvice', 
+                  'createOrder', 
+                  'onStopTrigger', 
+                  'cancelOrder');
 
   this.brokerConfig = {
     ...config.trader,

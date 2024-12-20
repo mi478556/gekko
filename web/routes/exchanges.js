@@ -26,6 +26,7 @@ module.exports = async (ctx) => {
       try {
         Trader = require(gekkoRoot + 'exchange/wrappers/' + exchange);
       } catch (e) {
+        console.log(e)
         continue;
       }
 

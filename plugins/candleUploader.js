@@ -5,7 +5,7 @@ const util = require('../core/util.js');
 const config = util.getConfig();
 
 const CandleUploader = function(done) {
-  _.bindAll(this);
+  _.bindAll(this, 'processCandle', 'schedule', 'rawUpload', 'upload', 'finish');
 
   done();
   this.candles = [];

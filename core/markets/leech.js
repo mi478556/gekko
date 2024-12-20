@@ -34,7 +34,7 @@ else
 
 var Market = function() {
 
-  _.bindAll(this);
+  _.bindAll(this, 'get', 'processCandles');
 
   Readable.call(this, {objectMode: true});
 

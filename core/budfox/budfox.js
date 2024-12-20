@@ -18,7 +18,7 @@ var MarketDataProvider =  require(dirs.budfox + 'marketDataProvider');
 var CandleManager = require(dirs.budfox + 'candleManager');
 
 var BudFox = function(config) {
-  _.bindAll(this);
+  _.bindAll(this, '_read', 'pushCandles');
 
   Readable.call(this, {objectMode: true});
 

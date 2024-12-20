@@ -8,7 +8,7 @@ var adviceLoggerConfig = config.adviceLogger;
 var Actor = function() {
   this.price = 'N/A';
   this.marketTime = {format: function() {return 'N/A'}};
-  _.bindAll(this);
+  _.bindAll(this, 'processCandle', 'processAdvice', 'finalize');
 }
 
 Actor.prototype.processCandle = function(candle, done) {
