@@ -40,6 +40,11 @@ var scan = function(done) {
       log.debug('Available', res.available);
       log.debug('Optimal', optimal);
 
+      if (res.available === 0) {
+        log.debug('No candles available in the database.');
+        return done(null, [], reader);
+      }
+
       // There is a candle for every minute
       if(res.available === optimal + 1) {
         log.info('Gekko is able to fully use the local history.');

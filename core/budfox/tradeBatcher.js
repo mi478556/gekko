@@ -93,25 +93,27 @@ TradeBatcher.prototype.write = function(batch) {
 }
 
 TradeBatcher.prototype.filter = function(batch) {
-  // make sure we're not trying to count
-  // beyond infinity
-  var lastTid = _.last(batch)[this.tid];
-  if(lastTid === lastTid + 1)
-    util.die('trade tid is max int, Gekko can\'t process..');
+  if (_.isEmpty(batch)) {
+    log.debug('Batch is empty.');
+    return [];
+  }
 
-  // remove trades that have zero amount
-  // see @link
-  // https://github.com/askmike/gekko/issues/486
-  batch = _.filter(batch, function(trade) {
+  if (!_.has(batch[0], this.tid)) {
+    log.debug(`Invalid tid key in trades: ${this.tid}`);
+    return [];
+  }
+
+  // Filter out zero-amount trades
+  batch = _.filter(batch, (trade) => {
     return trade.amount > 0;
   });
 
-  // weed out known trades
-  // TODO: optimize by stopping as soon as the
-  // first trade is too old (reverse first)
-  return _.filter(batch, function(trade) {
+  // Filter out known trades
+  const result = _.filter(batch, (trade) => {
     return this.last < trade[this.tid];
-  }, this);
+  });
+
+  return result;
 }
 
 TradeBatcher.prototype.convertDates = function(batch) {

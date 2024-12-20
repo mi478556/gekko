@@ -89,8 +89,8 @@ Market.prototype = Object.create(Readable.prototype, {
 Market.prototype._read = _.noop;
 
 Market.prototype.pushCandles = function(candles) {
-  _.each(candles, this.push);
-}
+  candles.forEach(candle => this.push(candle));
+};
 
 Market.prototype.get = function() {
   this.fetcher.fetch();
