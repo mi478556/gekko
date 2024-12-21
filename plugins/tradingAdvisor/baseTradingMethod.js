@@ -237,7 +237,7 @@ Base.prototype.addTulipIndicator = function(name, type, parameters) {
 }
 
 Base.prototype.addIndicator = function(name, type, parameters) {
-  if(!_.contains(allowedIndicators, type))
+  if(!_.includes(allowedIndicators, type))
     util.die('I do not know the indicator ' + type);
 
   if(this.setup)

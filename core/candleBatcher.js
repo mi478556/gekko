@@ -32,10 +32,10 @@ CandleBatcher.prototype.write = function(candles) {
 
   this.emitted = 0;
 
-  _.each(candles, function(candle) {
+  _.each(candles, (candle) => {
     this.smallCandles.push(candle);
     this.check();
-  }, this);
+});
 
   return this.emitted;
 }

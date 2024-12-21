@@ -97,7 +97,7 @@ export default {
       if(!this.customTo)
         set = val;
       else {
-        set = Vue.util.extend({}, val);
+        set = Object.assign({}, val);
         set.to = moment.utc(this.customTo, 'YYYY-MM-DD HH:mm').format();
         set.from = moment.utc(this.customFrom, 'YYYY-MM-DD HH:mm').format();
       }
