@@ -61,10 +61,9 @@ var Base = function(settings) {
   this._currentDirection;
 
   // make sure we have all methods
-  _.each(['init', 'check'], function(fn) {
-    if(!this[fn])
-      util.die('No ' + fn + ' function in this strategy found.')
-  }, this);
+  _.each(['init', 'check'], (fn) => {
+    if (!this[fn]) util.die('No ' + fn + ' function in this strategy found.');
+  });
 
   if(!this.update)
     this.update = function() {};
