@@ -225,7 +225,7 @@ export default {
       if(!this.data)
         return 'Loading...';
 
-      let stratParams = Vue.util.extend({}, this.data.config[this.stratName]);
+      let stratParams = Object.assign({}, this.data.config[this.stratName]);
       delete stratParams.__empty;
 
       if(_.isEmpty(stratParams))
@@ -248,7 +248,7 @@ export default {
         return false;
       }
 
-      let watch = Vue.util.extend({}, this.data.config.watch);
+      let watch = Object.assign({}, this.data.config.watch);
       return _.find(this.gekkos, g => {
         if(g.id === this.id)
           return false;
@@ -261,7 +261,7 @@ export default {
         return false;
       }
 
-      let watch = Vue.util.extend({}, this.data.config.watch);
+      let watch = Object.assign({}, this.data.config.watch);
 
       return _.find(this.gekkos, g => {
         if(g.id === this.id)
