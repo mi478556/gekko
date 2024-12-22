@@ -71,7 +71,7 @@ BudFox.prototype = Object.create(Readable.prototype, {
 
 BudFox.prototype._read = function noop() {}
 
-BudFox.prototype.pushCandles = function(candles) {
+BudFox.prototype.pushCandles = (candles) => {
   _.each(candles, this.push);
 }
 

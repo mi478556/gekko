@@ -24,7 +24,7 @@ const retryInstance = (options, checkFn, callback, e) => {
         return callback(undefined, result);
       }
 
-      console.log(new Date, err.message);
+      console.log(new Date, err);
 
       let maxAttempts = err.retry;
       if(maxAttempts === true)
