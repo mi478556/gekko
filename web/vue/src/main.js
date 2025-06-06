@@ -4,6 +4,8 @@ import App from './App.vue';
 import { createRouter, createWebHashHistory } from 'vue-router';
 import store from './store'; // Assuming the Vuex store has been updated to use `createStore`
 
+import RLAgentDashboard from './components/learning/RLAgentDashboard.vue';
+
 import backtester from './components/backtester/backtester.vue';
 import home from './components/layout/home.vue';
 
@@ -29,6 +31,7 @@ const routes = [
   { path: '/live-gekkos', component: gekkoList },
   { path: '/live-gekkos/new', component: newGekko },
   { path: '/live-gekkos/:id', component: singleGekko },
+  { path: '/rl-agent', component: RLAgentDashboard },
 ];
 
 // Create the router instance

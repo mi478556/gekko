@@ -92,6 +92,7 @@ router.post('/api/scan', require(ROUTE('scanDateRange')));
 router.post('/api/scansets', require(ROUTE('scanDatasets')));
 router.post('/api/backtest', require(ROUTE('backtest')));
 router.post('/api/import', require(ROUTE('import')));
+router.post('/api/train', require(ROUTE('train')));
 router.post('/api/startGekko', require(ROUTE('startGekko')));
 router.post('/api/stopGekko', require(ROUTE('stopGekko')));
 router.post('/api/deleteGekko', require(ROUTE('deleteGekko')));
