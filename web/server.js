@@ -106,6 +106,55 @@ app
   .use(router.routes())
   .use(router.allowedMethods());
 
+const { spawn } = require('child_process');
+const os = require('os');
+const path = require('path');
+const fs = require('fs');
+
+const isWindows = os.platform() === 'win32';
+
+const finrlDir = path.join(__dirname, '../external/finrl_api');
+const finrlSubmodulePath = path.join(finrlDir, 'finrl_mod');
+const pythonPath = isWindows
+  ? path.join(finrlDir, 'venv', 'Scripts', 'python.exe')
+  : path.join(finrlDir, 'venv', 'bin', 'python');
+const appPath = path.join(finrlDir, 'app.py');
+
+if (!fs.existsSync(finrlSubmodulePath)) {
+  console.error('[ERROR] FinRL submodule (finrl_mod) not found.');
+  console.error('Did you run: git submodule update --init --recursive ?');
+  process.exit(1);
+}
+
+if (!fs.existsSync(pythonPath)) {
+  console.error('[ERROR] Python virtual environment not found.');
+  console.error('Did you run setup_rl.sh or setup_rl.bat?');
+  process.exit(1);
+}
+
+console.log('[INFO] Starting FinRL API...');
+
+const rlProcess = spawn(pythonPath, ['app.py'], {
+  cwd: finrlDir,
+  stdio: 'inherit'
+});
+
+rlProcess.on('exit', code => {
+  console.log(`[INFO] FinRL API exited with code ${code}`);
+});
+
+process.on('SIGINT', () => {
+  console.log('\n[INFO] Shutting down FinRL API...');
+  rlProcess.kill('SIGINT');
+  process.exit();
+});
+
+process.on('SIGTERM', () => {
+  console.log('\n[INFO] SIGTERM received. Terminating FinRL API...');
+  rlProcess.kill('SIGTERM');
+  process.exit();
+});
+
 server.timeout = config.api.timeout || 120000;
 server.on('request', app.callback());
 server.listen(config.api.port, config.api.host, '::', () => {

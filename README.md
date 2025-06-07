@@ -26,6 +26,38 @@ Note: This fork is still in production and is not tested! Join the Discord below
 
 See the updated [installing Gekko doc](https://gekko.wizb.it/docs/installation/installing_gekko.html). Make sure you use Node.js version 18 to enjoy full compatibility.
 
+## RL Environment Setup
+
+After cloning the repo and running `npm install`, set up the RL backend:
+
+# Linux/macOS setup
+npm run setup:rl
+
+# Windows setup
+npm run setup:rl:win
+
+## Note to devs: Updating the FinRL Submodule
+
+If you've made changes to your FinRL fork and want to update the version used in this project:
+
+```bash
+
+1. Navigate into the submodule directory:
+   cd external/finrl_api/finrl_mod
+
+2. Pull the latest changes from your FinRL fork:
+   git pull origin main  # or your working branch
+
+3. Return to the root of the Gekko repo:
+   cd ../../../..
+
+4. Stage and commit the updated submodule pointer:
+   git add external/finrl_api/finrl_mod
+   git commit -m "Update FinRL submodule to latest commit"
+   git push
+
+This ensures others will use the same FinRL version when they clone the repo.
+```
 ## Community & Support
 
 Join the discussion about the revived Gekko project and automated trading on:
