@@ -1,0 +1,3 @@
+[submodule "external/finrl_api"]
+	path = external/finrl_api
+	url = https://github.com/mi478556/FinRL_mod.git
