@@ -5,5 +5,5 @@ dependencies:
   - python=3.9
   - pip
   - pip:
-    - -r external/finrl_api/requirements.txt
-    - -e external/finrl_api/finrl_mod
+    - -r requirements.txt
+    - -e ./finrl_mod
