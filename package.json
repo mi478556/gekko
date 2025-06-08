@@ -9,11 +9,13 @@
     "TA",
     "finance"
   ],
-  "scripts": {
-    "test": "./node_modules/.bin/mocha test/*.js --recursive test -u tdd --reporter spec",
-    "start": "node ./gekko --config config.js --ui",
-    "postinstall": "git submodule update --init --recursive"
-  },
+"scripts": {
+  "test": "./node_modules/.bin/mocha test/*.js --recursive test -u tdd --reporter spec",
+  "start": "node ./gekko --config config.js --ui",
+  "postinstall": "git submodule update --init --recursive",
+  "setup:rl": "bash external/setup_rl.sh",
+  "setup:rl:win": "external\\setup_rl.bat"
+},
   "author": "Mike van Rossum <mike@mvr.me>",
   "dependencies": {
     "@koa/cors": "^5.0.0",
