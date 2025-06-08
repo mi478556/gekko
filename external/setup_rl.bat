@@ -1,29 +1,14 @@
 @echo off
-cd /d %~dp0\finrl_api
+setlocal
 
-where python >nul 2>nul
-if %errorlevel% neq 0 (
-  echo Python not found. Install Python >= 3.7.
-  exit /b 1
+set CONDA_DIR=external\miniconda3
+
+if not exist %CONDA_DIR%\Scripts\activate.bat (
+  echo Downloading and installing Miniconda...
+  powershell -Command "Invoke-WebRequest https://repo.anaconda.com/miniconda/Miniconda3-latest-Windows-x86_64.exe -OutFile external\miniconda_installer.exe"
+  start /wait external\miniconda_installer.exe /InstallationType=JustMe /AddToPath=0 /RegisterPython=0 /S /D=%CD%\%CONDA_DIR%
 )
 
-:: Create virtual environment
-if not exist venv (
-  echo Creating virtual environment...
-  python -m venv venv
-)
-
-:: Activate
-call venv\Scripts\activate
-
-:: Install FinRL
-echo Installing finrl_mod with pip...
-cd finrl_mod
-pip install .
-cd ..
-
-:: Install API server dependencies
-echo Installing app.py dependencies...
-pip install -r requirements.txt
-
-echo FinRL API environment is ready.
+call %CONDA_DIR%\Scripts\activate.bat
+conda env create -f external\finrl_api\environment.yaml || conda env update -f external\finrl_api\environment.yaml
+echo FinRL environment ready.

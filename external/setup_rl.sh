@@ -1,29 +1,13 @@
 #!/bin/bash
 
-cd "$(dirname "$0")/finrl_api"
+CONDA_DIR="external/miniconda3"
 
-# Confirm Python 3
-if ! command -v python3 &> /dev/null; then
-  echo "Python 3 not found. Install Python >= 3.7."
-  exit 1
+if [ ! -d "$CONDA_DIR" ]; then
+  echo "Installing Miniconda..."
+  curl -L -o external/miniconda.sh https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
+  bash external/miniconda.sh -b -p "$CONDA_DIR"
 fi
 
-# Set up virtual environment
-if [ ! -d "venv" ]; then
-  echo "Creating virtual environment..."
-  python3 -m venv venv
-fi
-
-source venv/bin/activate
-
-# Install FinRL fork from local path
-echo "Installing finrl_mod with pip..."
-cd finrl_mod
-pip install .
-cd ..
-
-# Install API requirements (Flask, etc.)
-echo "Installing app.py dependencies..."
-pip install -r requirements.txt
-
-echo "✅ FinRL API environment is ready."
+source "$CONDA_DIR/bin/activate"
+conda env create -f external/finrl_api/environment.yaml || conda env update -f external/finrl_api/environment.yaml
+echo "✅ FinRL environment is ready."

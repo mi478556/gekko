@@ -1,0 +1,9 @@
+name: finrl_env
+channels:
+  - defaults
+dependencies:
+  - python=3.9
+  - pip
+  - pip:
+    - -r external/finrl_api/requirements.txt
+    - -e external/finrl_api/finrl_mod
