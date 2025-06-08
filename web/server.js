@@ -115,10 +115,12 @@ const isWindows = os.platform() === 'win32';
 
 const finrlDir = path.join(__dirname, '../external/finrl_api');
 const finrlSubmodulePath = path.join(finrlDir, 'finrl_mod');
+const condaBase = path.join(__dirname, '../external/miniconda3');
+const condaEnvName = 'finrl_env';
+
 const pythonPath = isWindows
-  ? path.join(finrlDir, 'venv', 'Scripts', 'python.exe')
-  : path.join(finrlDir, 'venv', 'bin', 'python');
-const appPath = path.join(finrlDir, 'app.py');
+  ? path.join(condaBase, 'envs', condaEnvName, 'python.exe')
+  : path.join(condaBase, 'envs', condaEnvName, 'bin', 'python');
 
 if (!fs.existsSync(finrlSubmodulePath)) {
   console.error('[ERROR] FinRL submodule (finrl_mod) not found.');
