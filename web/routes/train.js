@@ -3,7 +3,7 @@ const axios = require('axios');
 module.exports = async (ctx) => {
   try {
     // POST to the RL agent REST API
-    const res = await axios.post('http://localhost:5000/api/train', ctx.request.body || {});
+    const res = await axios.post('http://127.0.0.1:5000/api/train', ctx.request.body || {});
     
     ctx.body = {
       jobId: res.data.jobId || 'unknown',
