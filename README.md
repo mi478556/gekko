@@ -36,7 +36,15 @@ npm run setup:rl
 ## Windows setup
 npm run setup:rl:win
 
-## Note to devs: Updating the FinRL Submodule
+## Note to devs: 
+
+## Running vue in dev mode:
+
+```bash
+   cd web\vue; npm run serve
+```
+
+## Updating the FinRL Submodule
 
 If you've made changes to your FinRL fork and want to update the version used in this project:
 
