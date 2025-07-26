@@ -20,11 +20,35 @@ module.exports = async (ctx) => {
 
     // POST to the RL agent REST API
     const res = await axios.post('http://127.0.0.1:5000/api/train', payload);
-
-    ctx.body = {
-      jobId: res.data.jobId || 'unknown',
-      status: 'started'
-    };
+    
+    console.log('API Response:', res.data);
+    
+    // Check if we have valid training results (not just the initial fallback values)
+    if (res.data.status === 'training complete' && res.data.evaluation_success) {
+      const response = {
+        status: 'completed',
+        final_portfolio_value: res.data.final_portfolio_value,
+        total_trades: res.data.total_trades,
+        returns: res.data.returns,
+        sharpe: res.data.sharpe,
+        metrics: {
+          portfolio_value: res.data.final_portfolio_value,
+          total_trades: res.data.total_trades,
+          returns: res.data.returns,
+          sharpe: res.data.sharpe
+        }
+      };
+      console.log('Sending completed training results to frontend:', response);
+      ctx.body = response;
+    } else {
+      // If we only have a job ID, send that
+      const response = {
+        jobId: res.data.jobId || 'unknown',
+        status: 'started'
+      };
+      console.log('Sending training started response to frontend:', response);
+      ctx.body = response;
+    }
   } catch (err) {
     console.error('Error forwarding to RL API:', err.message || err);
     ctx.status = 500;
