@@ -51,6 +51,9 @@ private-*.toml
 SECRET-api-keys.json
 exchange/nusadua
 
+# Python cache files
+__pycache__/
+
 # Conda environment (auto-installed)
 external/miniconda3/
 external/miniconda_installer.exe
