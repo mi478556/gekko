@@ -151,14 +151,8 @@
         </div>
       </section>
 
-      <section class="error-message card" v-if="error">
+      <section class="error-message card" v-if="error && error !== 'Training job started. Waiting for results...'">
         <p class="error">{{ error }}</p>
-      </section>
-
-      <!-- Legacy dashboard content at the bottom -->
-      <section class="legacy-dashboard">
-        <h2>Legacy RL Agent Dashboard</h2>
-        <!-- ...existing RLAgentDashboard.vue content can be placed here if needed... -->
       </section>
     </main>
   </div>
