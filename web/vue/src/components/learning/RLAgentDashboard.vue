@@ -1,397 +1,537 @@
-<template lang='pug'>
-  div
-    h2.contain RL Agent Dashboard
-    .hr
-    .txt--center
-      a.w100--s.my1.btn--primary(
-        href='#',
-        v-if='!isTraining',
-        @click.prevent='startTraining'
-      ) Train Model
-      div(v-if='isTraining')
-        .scan-btn
-          p Training in progress...
-          spinner
-        .progress-container(v-if='trainingStatus && trainingStatus.current_step')
-          .progress-bar
-            .progress-fill(:style='{ width: progressPercentage + "%" }')
-          .progress-details
-            p.step-info Steps: {{ trainingStatus.current_step }} / {{ trainingStatus.total_steps }}
-            p.progress-text Progress: {{ progressPercentage }}%
 
-    .training-stats(v-if='Object.keys(trainingStats).length')
-      h3 Training Results
-      .stat-grid
-        .stat-item
-          label Final Portfolio Value
-          .value {{ formatCurrency(trainingStats.portfolio_value) }}
-        .stat-item
-          label Total Trades
-          .value {{ trainingStats.total_trades }}
-        .stat-item
-          label Returns
-          .value {{ formatPercentage(trainingStats.returns) }}
-        .stat-item
-          label Sharpe Ratio
-          .value {{ trainingStats.sharpe ? trainingStats.sharpe.toFixed(2) : 'N/A' }}
-      
-    .error-message(v-if='error')
-      p.error {{ error }}
+<template>
+  <div class="finrl-dashboard">
+    <header class="sticky-header">
+      <h1>FinRL RL Agent Training</h1>
+      <p class="tagline">Configure, train, and analyze RL agents for trading.</p>
+    </header>
+    <main class="dashboard-main">
+      <section class="config-section card">
+        <h2>Configuration</h2>
+        <form @submit.prevent="startTraining" class="config-form">
+          <!-- ...existing code... -->
+          <details open>
+            <summary>Data & Environment</summary>
+            <div class="form-row">
+              <label>Start Date</label>
+              <input type="date" v-model="config.start_date" required name="start_date" />
+              <label>End Date</label>
+              <input type="date" v-model="config.end_date" required name="end_date" />
+            </div>
+            <div class="form-row">
+              <label>Initial Capital</label>
+              <input type="number" v-model.number="config.capital" min="1000" step="100" name="capital" />
+              <label>Tickers</label>
+              <input type="text" v-model="config.tickers" placeholder="AAPL,MSFT,GOOG" name="tickers" />
+            </div>
+            <div class="form-row">
+              <label>Indicators</label>
+              <select v-model="config.indicators" multiple name="indicators">
+                <option v-for="ind in indicatorOptions" :key="ind" :value="ind">{{ ind }}</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Buy Cost (%)</label>
+              <input type="number" v-model.number="config.buy_cost_pct" min="0" max="0.1" step="0.001" name="buy_cost_pct" />
+              <label>Sell Cost (%)</label>
+              <input type="number" v-model.number="config.sell_cost_pct" min="0" max="0.1" step="0.001" name="sell_cost_pct" />
+            </div>
+            <div class="form-row">
+              <label>Max Shares per Trade (hmax)</label>
+              <input type="number" v-model.number="config.hmax" min="1" step="1" name="hmax" />
+              <label>Reward Scaling</label>
+              <input type="number" v-model.number="config.reward_scaling" min="0" step="0.0001" name="reward_scaling" />
+            </div>
+            <div class="form-row">
+              <label>Turbulence Threshold</label>
+              <input type="number" v-model.number="config.turbulence_threshold" min="0" step="1" name="turbulence_threshold" />
+              <label>Risk Indicator Column</label>
+              <input type="text" v-model="config.risk_indicator_col" name="risk_indicator_col" />
+            </div>
+            <div class="form-row">
+              <label>Enable Plots</label>
+              <input type="checkbox" v-model="config.make_plots" name="make_plots" />
+            </div>
+          </details>
+          <details>
+            <summary>Model & Training</summary>
+            <div class="form-row">
+              <label>Strategy</label>
+              <select v-model="config.strategy" name="strategy">
+                <option v-for="s in strategyOptions" :key="s" :value="s">{{ s }}</option>
+              </select>
+              <label>Policy Type</label>
+              <select v-model="config.policy" name="policy">
+                <option v-for="p in policyOptions" :key="p" :value="p">{{ p }}</option>
+              </select>
+            </div>
+            <div class="form-row">
+              <label>Learning Rate</label>
+              <input type="number" v-model.number="config.learning_rate" min="0.00001" max="0.01" step="0.00001" name="learning_rate" />
+              <label>Batch Size</label>
+              <input type="number" v-model.number="config.batch_size" min="16" max="512" step="16" name="batch_size" />
+            </div>
+            <div class="form-row">
+              <label>Entropy Coefficient</label>
+              <input type="number" v-model.number="config.ent_coef" min="0" max="1" step="0.001" name="ent_coef" />
+              <label>Total Timesteps</label>
+              <input
+                type="number"
+                v-model.number="config.total_timesteps"
+                min="1"
+                step="1"
+                name="total_timesteps"
+                required
+                placeholder="e.g. 2048"
+                autocomplete="off"
+              />
+            </div>
+            <div class="form-row">
+              <label>Device</label>
+              <select v-model="config.device" name="device">
+                <option value="cpu">CPU</option>
+                <option value="cuda">GPU (CUDA)</option>
+              </select>
+            </div>
+          </details>
+          <details>
+            <summary>Miscellaneous</summary>
+            <div class="form-row">
+              <label>Save Model</label>
+              <input type="checkbox" v-model="config.save_model" name="save_model" />
+              <label>Verbose Logging</label>
+              <input type="checkbox" v-model="config.verbose" name="verbose" />
+              <label>Random Seed</label>
+              <input type="number" v-model.number="config.seed" min="0" step="1" name="seed" />
+            </div>
+          </details>
+          <button class="train-btn" type="submit" :disabled="isTraining">
+            <span v-if="!isTraining"><span class="rocket">🚀</span> Train Model</span>
+            <span v-else>Training...</span>
+          </button>
+        </form>
+      </section>
+
+      <section class="progress-section card" v-if="isTraining">
+        <h2>Training Progress</h2>
+        <div class="progress-bar">
+          <div class="progress-fill" :style="{ width: progressPercentage + '%' }"></div>
+        </div>
+        <div class="progress-details">
+          <p class="step-info">Steps: {{ trainingStatus?.current_step }} / {{ trainingStatus?.total_steps }}</p>
+          <p class="progress-text">Progress: {{ progressPercentage }}%</p>
+          <p v-if="trainingStatus?.episode">Episode: {{ trainingStatus.episode }}</p>
+          <p v-if="trainingStatus?.device">Device: {{ trainingStatus.device }}</p>
+        </div>
+        <div class="scan-btn">
+          <p>Training in progress...</p>
+          <spinner />
+        </div>
+      </section>
+
+      <section class="training-stats card" v-if="Object.keys(trainingStats).length">
+        <h2>Training Results</h2>
+        <div class="stat-grid">
+          <div class="stat-item">
+            <label>Final Portfolio Value</label>
+            <div class="value">{{ formatCurrency(trainingStats.portfolio_value) }}</div>
+          </div>
+          <div class="stat-item">
+            <label>Total Trades</label>
+            <div class="value">{{ trainingStats.total_trades }}</div>
+          </div>
+          <div class="stat-item">
+            <label>Returns</label>
+            <div class="value">{{ formatPercentage(trainingStats.returns) }}</div>
+          </div>
+          <div class="stat-item" v-if="trainingStats.sharpe">
+            <label>Sharpe Ratio</label>
+            <div class="value">{{ trainingStats.sharpe.toFixed(2) }}</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="error-message card" v-if="error">
+        <p class="error">{{ error }}</p>
+      </section>
+
+      <!-- Legacy dashboard content at the bottom -->
+      <section class="legacy-dashboard">
+        <h2>Legacy RL Agent Dashboard</h2>
+        <!-- ...existing RLAgentDashboard.vue content can be placed here if needed... -->
+      </section>
+    </main>
+  </div>
 </template>
 
-<script>
+
+<script setup>
+import { ref, computed, onBeforeUnmount } from 'vue';
 import { post } from '../../tools/ajax';
 import spinner from '../global/blockSpinner.vue';
 
-export default {
-  data: () => ({
-    isTraining: false,
-    trainingStatus: null,
-    trainingStats: {},
-    error: null,
-    ws: null
-  }),
-  computed: {
-    progressPercentage() {
-      if (!this.trainingStatus?.current_step || !this.trainingStatus?.total_steps) return 0;
-      return Math.min(100, Math.round((this.trainingStatus.current_step / this.trainingStatus.total_steps) * 100));
-    }
-  },
-  methods: {
-    async startTraining() {
-      console.log('Starting training...');
-      this.isTraining = true;
-      this.error = null;
-      this.trainingStats = {};
+const isTraining = ref(false);
+const trainingStatus = ref(null);
+const trainingStats = ref({});
+const error = ref(null);
+const ws = ref(null);
 
-      // Connect to WebSocket and wait for connection before starting training
-      try {
-        await this.connectWebSocket();
-        console.log('WebSocket connected, starting training...');
-        
-        post('train', {
-          strategy: 'ppo',
-          start_date: '2020-01-01',
-          end_date: '2020-12-31',
-          capital: 100000
-        }, (error, response) => {
-          console.log('Post callback received:', { error, response });
-          
-          if (error) {
-            console.error('Training error:', error);
-            this.error = 'Failed to start training: ' + error.message;
-            this.isTraining = false;
-          } else {
-            console.log('Training response:', response);
-            // If we got completed training results in the HTTP response
-            if (response.status === 'completed') {
-              console.log('Training completed with results');
-              this.trainingStats = {
-                portfolio_value: response.final_portfolio_value,
-                total_trades: response.total_trades,
-                returns: response.returns
-              };
-              this.isTraining = false;
-            } else {
-              console.log('Training started, waiting for WebSocket updates...');
-              // Keep isTraining true as we'll wait for WebSocket updates
-            }
-          }
-        });
-      } catch (error) {
-        console.error('Connection error:', error);
-        this.error = 'Failed to connect to training server';
-        this.isTraining = false;
-      }
-    },
-    
-    connectWebSocket() {
-      return new Promise((resolve, reject) => {
-        // Close existing connection if any
-        if (this.ws) {
-          this.ws.close();
-        }
+const config = ref({
+  start_date: '2020-01-01',
+  end_date: '2020-12-31',
+  capital: 100000,
+  tickers: 'AAPL',
+  indicators: ['macd', 'rsi_30', 'cci_30'],
+  buy_cost_pct: 0.001,
+  sell_cost_pct: 0.001,
+  hmax: 100,
+  reward_scaling: 0.0001,
+  turbulence_threshold: 0,
+  risk_indicator_col: 'turbulence',
+  make_plots: false,
+  strategy: 'ppo',
+  policy: 'MlpPolicy',
+  learning_rate: 0.00025,
+  batch_size: 64,
+  total_timesteps: 2048,
+  ent_coef: 0.01,
+  device: 'cpu',
+  save_model: false,
+  verbose: false,
+  seed: 42
+});
 
-        this.ws = new WebSocket('ws://localhost:5000/ws');
-        
-        this.ws.onopen = () => {
-          console.log('WebSocket connection established');
-          resolve();
-        };
-        
-        this.ws.onerror = (error) => {
-          console.error('WebSocket connection error:', error);
-          reject(error);
-        };
-        
-        this.ws.onmessage = (event) => {
-          console.log('WebSocket message received:', event.data);
-          const status = JSON.parse(event.data);
-          console.log('Parsed status update:', status);
-          
-          // Update training status and progress
-          if (status.current_step !== undefined) {
-            console.log('Updating training status:', {
-              current: status.current_step,
-              total: status.total_steps
-            });
-            this.trainingStatus = {
-              current_step: status.current_step,
-              total_steps: status.total_steps
-            };
-          }
-          
-          // Function to update metrics from any source
-          const updateMetrics = (metrics) => {
-            console.log('Updating metrics (raw):', metrics);
-            if (metrics && (metrics.portfolio_value !== undefined || metrics.total_trades !== undefined)) {
-              // Log each value with its type
-              console.log('Metric values:', {
-                portfolio_value: { value: metrics.portfolio_value, type: typeof metrics.portfolio_value },
-                total_trades: { value: metrics.total_trades, type: typeof metrics.total_trades },
-                returns: { value: metrics.returns, type: typeof metrics.returns },
-                sharpe: { value: metrics.sharpe, type: typeof metrics.sharpe }
-              });
-              
-              // Convert and validate each value
-              const returns = parseFloat(metrics.returns);
-              const sharpe = parseFloat(metrics.sharpe);
-              
-              this.trainingStats = {
-                portfolio_value: metrics.portfolio_value || 0,
-                total_trades: metrics.total_trades || 0,
-                returns: isNaN(returns) ? 0 : returns,
-                sharpe: isNaN(sharpe) ? null : sharpe
-              };
-              
-              console.log('Updated training stats:', this.trainingStats);
-              return true;
-            }
-            return false;
-          };
-          
-          // Try to get metrics from different possible sources
-          const hasMetrics = 
-            updateMetrics(status.metrics) || // From metrics object
-            updateMetrics({  // From direct properties
-              portfolio_value: status.portfolio_value,
-              total_trades: status.total_trades,
-              returns: status.returns,
-              sharpe: status.sharpe
-            });
-          
-          if (hasMetrics) {
-            // Training is complete with metrics
-            console.log('Training complete with metrics, final stats:', this.trainingStats);
-            this.isTraining = false;
-            setTimeout(() => {
-              this.ws.close();
-            }, 500);
-            return;
-          }
-          
-          // Check if training is complete (but wait for metrics)
-          const isComplete = 
-            status.status === 'completed' || 
-            !status.is_training || 
-            (status.current_step !== undefined && status.current_step >= status.total_steps);
-          
-          if (isComplete) {
-            console.log('Training progress complete, waiting for final metrics:', {
-              status: status.status,
-              is_training: status.is_training,
-              progress: status.current_step + '/' + status.total_steps
-            });
-            // Keep training state true until we get metrics
-          }
-        };
-        
-        this.ws.onclose = () => {
-          console.log('WebSocket connection closed');
-          // If training was still in progress when connection closed, 
-          // we might have missed the final results
-          if (this.isTraining) {
-            console.log('WebSocket closed while training, checking for completed results via HTTP...');
-            // Give a moment for any final processing, then check status
-            setTimeout(() => {
-              this.checkTrainingStatus();
-            }, 2000);
-          }
-        };
-      });
-    },
-    
-    async checkTrainingStatus() {
-      try {
-        console.log('Checking training status via HTTP...');
-        const response = await fetch('http://localhost:5000/api/status');
-        const status = await response.json();
-        console.log('Status check response:', status);
-        
-        if (!status.is_training && (status.portfolio_value || status.total_trades)) {
-          console.log('Found completed training results, updating UI...');
-          this.trainingStats = {
-            portfolio_value: status.portfolio_value || 0,
-            total_trades: status.total_trades || 0,
-            returns: status.returns || 0,
-            sharpe: status.sharpe || null
-          };
-          this.isTraining = false;
-        }
-      } catch (error) {
-        console.error('Error checking training status:', error);
-      }
-    },
-    
-    formatCurrency(value) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD'
-      }).format(value);
-    },
-    
-    formatPercentage(value) {
-      if (value === undefined || value === null || isNaN(value)) {
-        return '0.00%';
-      }
-      
-      // Convert to number if it's a string
-      const numValue = typeof value === 'string' ? parseFloat(value) : value;
-      
-      if (isNaN(numValue)) {
-        return '0.00%';
-      }
-      
-      // Handle both decimal (0.05 = 5%) and percentage (5 = 5%) formats
-      // If the absolute value is greater than 2, assume it's already a percentage
-      const displayValue = Math.abs(numValue) > 2 ? numValue / 100 : numValue;
-      
-      return new Intl.NumberFormat('en-US', {
-        style: 'percent',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2
-      }).format(displayValue);
-    }
-  },
-  
-  beforeUnmount() {
-    // Clean up WebSocket connection
-    if (this.ws) {
-      this.ws.close();
-    }
-  },
-  
-  components: {
-    spinner
+const indicatorOptions = [
+  'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30', 'close_30_sma', 'close_60_sma', 'turbulence'
+];
+const strategyOptions = ['ppo', 'a2c', 'ddpg', 'sac', 'td3'];
+const policyOptions = ['MlpPolicy', 'CnnPolicy'];
+
+const progressPercentage = computed(() => {
+  if (!trainingStatus.value?.current_step || !trainingStatus.value?.total_steps) return 0;
+  return Math.min(100, Math.round((trainingStatus.value.current_step / trainingStatus.value.total_steps) * 100));
+});
+
+function formatCurrency(value) {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD'
+  }).format(value);
+}
+
+function formatPercentage(value) {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0.00%';
   }
-};
+  const numValue = typeof value === 'string' ? parseFloat(value) : value;
+  if (isNaN(numValue)) {
+    return '0.00%';
+  }
+  const displayValue = Math.abs(numValue) > 2 ? numValue / 100 : numValue;
+  return new Intl.NumberFormat('en-US', {
+    style: 'percent',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(displayValue);
+}
+
+async function startTraining() {
+  // Basic client-side validation for required fields
+  const requiredFields = [
+    'start_date', 'end_date', 'capital', 'tickers', 'indicators', 'buy_cost_pct', 'sell_cost_pct',
+    'hmax', 'reward_scaling', 'turbulence_threshold', 'risk_indicator_col', 'strategy', 'policy',
+    'learning_rate', 'batch_size', 'total_timesteps', 'ent_coef', 'device', 'seed'
+  ];
+  for (const field of requiredFields) {
+    const value = config.value[field];
+    if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
+      error.value = `Please fill in the required field: ${field.replace(/_/g, ' ')}`;
+      return;
+    }
+  }
+  isTraining.value = true;
+  error.value = null;
+  trainingStats.value = {};
+  await connectWebSocket();
+  // Log the outgoing request for debugging
+  console.log('Sending training request:', { ...config.value });
+  post('train', { ...config.value }, (err, response) => {
+    if (err) {
+      // Log error to console for debugging
+      console.error('AJAX error:', err);
+      error.value = 'Failed to start training: ' + (err.message || err);
+      isTraining.value = false;
+      return;
+    }
+    // Log response for debugging
+    console.log('Training response:', response);
+    if (response && response.status === 'completed') {
+      trainingStats.value = {
+        portfolio_value: response.final_portfolio_value,
+        total_trades: response.total_trades,
+        returns: response.returns,
+        sharpe: response.sharpe
+      };
+      isTraining.value = false;
+    } else if (response && response.status === 'started') {
+      // Show job started message if available
+      error.value = 'Training job started. Waiting for results...';
+    } else {
+      error.value = 'Unexpected response from backend.';
+      isTraining.value = false;
+    }
+  });
+}
+
+function connectWebSocket() {
+  return new Promise((resolve, reject) => {
+    if (ws.value) ws.value.close();
+    ws.value = new WebSocket('ws://localhost:5000/ws');
+    ws.value.onopen = () => resolve();
+    ws.value.onerror = (e) => reject(e);
+    ws.value.onmessage = (event) => {
+      const status = JSON.parse(event.data);
+      // Assign all status fields for full progress info
+      trainingStatus.value = status;
+      const updateMetrics = (metrics) => {
+        if (metrics && (metrics.portfolio_value !== undefined || metrics.total_trades !== undefined)) {
+          const returns = parseFloat(metrics.returns);
+          const sharpe = parseFloat(metrics.sharpe);
+          trainingStats.value = {
+            portfolio_value: metrics.portfolio_value || 0,
+            total_trades: metrics.total_trades || 0,
+            returns: isNaN(returns) ? 0 : returns,
+            sharpe: isNaN(sharpe) ? null : sharpe
+          };
+          return true;
+        }
+        return false;
+      };
+      const hasMetrics =
+        updateMetrics(status.metrics) ||
+        updateMetrics({
+          portfolio_value: status.portfolio_value,
+          total_trades: status.total_trades,
+          returns: status.returns,
+          sharpe: status.sharpe
+        });
+      if (hasMetrics) {
+        isTraining.value = false;
+        setTimeout(() => {
+          ws.value.close();
+        }, 500);
+        return;
+      }
+    };
+    ws.value.onclose = () => {
+      if (isTraining.value) {
+        setTimeout(() => {
+          checkTrainingStatus();
+        }, 2000);
+      }
+    };
+  });
+}
+
+async function checkTrainingStatus() {
+  try {
+    const response = await fetch('http://localhost:5000/api/status');
+    const status = await response.json();
+    if (!status.is_training && (status.portfolio_value || status.total_trades)) {
+      trainingStats.value = {
+        portfolio_value: status.portfolio_value || 0,
+        total_trades: status.total_trades || 0,
+        returns: status.returns || 0,
+        sharpe: status.sharpe || null
+      };
+      isTraining.value = false;
+    }
+  } catch (err) {
+    // ignore
+  }
+}
+
+onBeforeUnmount(() => {
+  if (ws.value) ws.value.close();
+});
 </script>
 
 <style scoped>
-.progress-info {
-  margin: 1rem 0;
-  text-align: left;
+.finrl-dashboard {
+  background: linear-gradient(180deg, #f8f9fa 0%, #eaf6fb 100%);
+  min-height: 100vh;
+  width: 100vw;
+  overflow-x: hidden;
+  padding-bottom: 4rem;
 }
-
-.training-progress {
-  margin: 2rem 0;
+.sticky-header {
+  position: sticky;
+  top: 0;
+  background: linear-gradient(90deg, #41b883 0%, #3498db 100%);
+  color: white;
+  padding: 2rem 1rem 1rem 1rem;
+  box-shadow: 0 2px 8px rgba(52,152,219,0.08);
+  z-index: 10;
+}
+.tagline {
+  font-size: 1.2em;
+  font-weight: 400;
+  margin-top: 0.5rem;
+  color: #eaf6fb;
+}
+.dashboard-main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 2rem 1rem;
+}
+.card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(52,152,219,0.08);
+  margin-bottom: 2rem;
+  padding: 2rem 1.5rem;
+}
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+.form-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin-bottom: 1rem;
+}
+.form-row label {
+  min-width: 120px;
+  font-weight: 500;
+  color: #3498db;
+}
+.form-row input,
+.form-row select {
+  flex: 1;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #eee;
+  font-size: 1em;
+}
+.form-row input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin-left: 0.5rem;
+}
+/* Train button styles */
+.train-btn {
+  background: linear-gradient(90deg, #41b883 0%, #3498db 100%);
+  color: white;
+  font-size: 1.2em;
+  font-weight: bold;
+  border: none;
+  border-radius: 8px;
+  padding: 1rem 2rem;
+  margin-top: 1rem;
+  box-shadow: 0 2px 8px rgba(52,152,219,0.08);
+  cursor: pointer;
+  transition: background 0.3s, box-shadow 0.3s, transform 0.2s;
+  position: relative;
+  outline: none;
+}
+.train-btn:hover:not(:disabled) {
+  background: linear-gradient(90deg, #3498db 0%, #41b883 100%);
+  box-shadow: 0 4px 16px rgba(52,152,219,0.18);
+  transform: translateY(-2px) scale(1.03);
+}
+.train-btn .rocket {
+  margin-right: 0.5em;
+  font-size: 1.2em;
+  vertical-align: middle;
+  transition: transform 0.2s;
+}
+.train-btn:hover .rocket {
+  transform: scale(1.2) rotate(-10deg);
+}
+.train-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.progress-section {
+  margin-top: 2rem;
   text-align: center;
 }
-
-.progress-container {
-  width: 100%;
-  max-width: 600px;
-  margin: 1rem auto;
-  padding: 1rem;
-  background: #f8f9fa;
-  border-radius: 8px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
-}
-
 .progress-bar {
   width: 100%;
-  height: 24px;
+  height: 28px;
   background: #eee;
-  border-radius: 12px;
+  border-radius: 14px;
   overflow: hidden;
   margin-bottom: 1rem;
   box-shadow: inset 0 1px 3px rgba(0,0,0,0.1);
 }
-
 .progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #41b883 0%, #3498db 100%);
   transition: width 0.3s ease;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
-
 .progress-details {
   text-align: left;
   padding: 0.5rem;
 }
-
 .progress-text {
   font-size: 1.1em;
   font-weight: 500;
   color: #34495e;
   margin: 0.5rem 0;
 }
-
 .step-info {
   font-size: 1em;
   color: #2c3e50;
   margin: 0.5rem 0;
 }
-
-.device-info {
-  font-size: 0.9em;
-  color: #666;
-  margin: 0.5rem 0;
-}
-
 .scan-btn {
   margin-bottom: 1rem;
 }
-
 .training-stats {
   margin-top: 2rem;
   padding: 1rem;
   background: #f5f5f5;
   border-radius: 8px;
 }
-
 .stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 1rem;
   margin-top: 1rem;
 }
-
 .stat-item {
   padding: 1rem;
   background: white;
   border-radius: 4px;
   box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
-
 .stat-item label {
   display: block;
   color: #666;
   font-size: 0.9em;
   margin-bottom: 0.5rem;
 }
-
 .stat-item .value {
   font-size: 1.2em;
   font-weight: bold;
   color: #41b883;
 }
-
 .error-message {
   margin-top: 1rem;
   padding: 1rem;
   background: #fdd;
   border-radius: 4px;
   color: #c00;
+}
+.legacy-dashboard {
+  margin-top: 4rem;
+  padding: 2rem;
+  background: #fffbe6;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(255,200,0,0.08);
 }
 </style>

@@ -53,6 +53,7 @@ exchange/nusadua
 
 # Python cache files
 __pycache__/
+external/finrl_api/results/
 
 # Conda environment (auto-installed)
 external/miniconda3/
