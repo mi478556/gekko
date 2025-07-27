@@ -1,4 +1,3 @@
-
 <template>
   <div class="finrl-dashboard">
     <header class="sticky-header">
@@ -9,14 +8,10 @@
       <section class="config-section card">
         <h2>Configuration</h2>
         <form @submit.prevent="startTraining" class="config-form">
+          <!-- Dataset picker from backtest -->
+          <dataset-picker class="my2" @dataset="onDatasetSelected" />
           <details open>
             <summary>Data & Environment</summary>
-            <div class="form-row">
-              <label>Start Date</label>
-              <input type="date" v-model="config.start_date" required name="start_date" />
-              <label>End Date</label>
-              <input type="date" v-model="config.end_date" required name="end_date" />
-            </div>
             <div class="form-row">
               <label>Initial Capital</label>
               <input type="number" v-model.number="config.capital" min="1000" step="100" name="capital" />
@@ -183,6 +178,7 @@
 import { ref, computed, onBeforeUnmount } from 'vue';
 import { post } from '../../tools/ajax';
 import spinner from '../global/blockSpinner.vue';
+import datasetPicker from '../global/configbuilder/datasetpicker.vue';
 
 const isTraining = ref(false);
 const trainingStatus = ref(null);
@@ -194,7 +190,7 @@ const config = ref({
   start_date: '2020-01-01',
   end_date: '2020-12-31',
   capital: 100000,
-  tickers: 'AAPL',
+  tickers: 'BTC/USD',
   indicators: ['turbulence'],
   buy_cost_pct: 0.001,
   sell_cost_pct: 0.001,
@@ -249,13 +245,50 @@ function formatPercentage(value) {
   }).format(displayValue);
 }
 
+const selectedDataset = ref(null);
+const selectedDatasetDates = ref({ from: null, to: null });
+
+function onDatasetSelected(dataset) {
+  // Update config fields based on selected dataset
+  selectedDataset.value = dataset;
+  if (!dataset) {
+    selectedDatasetDates.value = { from: null, to: null };
+    return;
+  }
+  if (dataset.from) {
+    config.value.start_date = dataset.from;
+    selectedDatasetDates.value.from = dataset.from;
+  }
+  if (dataset.to) {
+    config.value.end_date = dataset.to;
+    selectedDatasetDates.value.to = dataset.to;
+  }
+  if (dataset.asset && dataset.currency) {
+    config.value.tickers = `${dataset.asset}/${dataset.currency}`;
+  } else if (dataset.asset) {
+    config.value.tickers = dataset.asset;
+  }
+  // Optionally update other config fields if available
+}
+
 async function startTraining() {
   // Basic client-side validation for required fields
   const requiredFields = [
-    'start_date', 'end_date', 'capital', 'tickers', 'buy_cost_pct', 'sell_cost_pct',
+    'capital', 'tickers', 'buy_cost_pct', 'sell_cost_pct',
     'hmax', 'reward_scaling', 'turbulence_threshold', 'risk_indicator_col', 'strategy', 'policy',
     'learning_rate', 'batch_size', 'total_timesteps', 'ent_coef', 'device', 'seed'
   ];
+  // Dataset must be selected
+  if (!selectedDataset.value) {
+    error.value = 'Please select a dataset.';
+    return;
+  }
+  // Dates must be present in selected dataset
+  if (!selectedDatasetDates.value.from || !selectedDatasetDates.value.to) {
+    error.value = 'Selected dataset does not have valid start/end dates.';
+    return;
+  }
+  // Validate other required fields
   for (const field of requiredFields) {
     const value = config.value[field];
     if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
@@ -268,8 +301,8 @@ async function startTraining() {
   trainingStats.value = {};
   await connectWebSocket();
   // Log the outgoing request for debugging
-  console.log('Sending training request:', { ...config.value });
-  post('train', { ...config.value }, (err, response) => {
+  console.log('Sending training request:', { dataset: selectedDataset.value, ...config.value });
+  post('train', { dataset: selectedDataset.value, ...config.value }, (err, response) => {
     if (err) {
       // Log error to console for debugging
       console.error('AJAX error:', err);
