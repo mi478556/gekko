@@ -25,7 +25,20 @@
               <input type="text" v-model="config.tickers" placeholder="AAPL,MSFT,GOOG" name="tickers" />
             </div>
             <div class="form-row">
-              <label>Indicators</label>
+              <label>
+                Indicators
+                <span class="info-bubble" tabindex="0" aria-label="Indicator selection help">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;">
+                    <circle cx="10" cy="10" r="9" stroke="#3498db" stroke-width="2" fill="#fff"/>
+                    <text x="10" y="15" text-anchor="middle" font-size="13" fill="#3498db" font-family="Arial" font-weight="bold">i</text>
+                  </svg>
+                  <span class="info-tooltip">
+                    <strong>How to select indicators:</strong><br>
+                    Hold <kbd>Ctrl</kbd> (Windows) or <kbd>Cmd</kbd> (Mac) to select multiple.<br>
+                    Only highlighted indicators are used for training.
+                  </span>
+                </span>
+              </label>
               <select v-model="config.indicators" multiple name="indicators">
                 <option v-for="ind in indicatorOptions" :key="ind" :value="ind">{{ ind }}</option>
               </select>
@@ -49,8 +62,10 @@
               <input type="text" v-model="config.risk_indicator_col" name="risk_indicator_col" />
             </div>
             <div class="form-row">
-              <label>Enable Plots</label>
-              <input type="checkbox" v-model="config.make_plots" name="make_plots" />
+              <label style="display:flex; align-items:center; gap:15px; margin-bottom:0;">
+                <input type="checkbox" v-model="config.make_plots" name="make_plots" />
+                Enable Plots
+              </label>
             </div>
           </details>
           <details>
@@ -97,12 +112,18 @@
           <details>
             <summary>Miscellaneous</summary>
             <div class="form-row">
-              <label>Save Model</label>
-              <input type="checkbox" v-model="config.save_model" name="save_model" />
-              <label>Verbose Logging</label>
-              <input type="checkbox" v-model="config.verbose" name="verbose" />
-              <label>Random Seed</label>
-              <input type="number" v-model.number="config.seed" min="0" step="1" name="seed" />
+              <label style="display:flex; align-items:center; gap:15px; margin-bottom:0;">
+                <input type="checkbox" v-model="config.save_model" name="save_model" />
+                Save Model
+              </label>
+              <label style="display:flex; align-items:center; gap:15px; margin-bottom:0;">
+                <input type="checkbox" v-model="config.verbose" name="verbose" />
+                Verbose Logging
+              </label>
+              <div style="display: flex; flex-direction: column; flex: 1; min-width: 120px;">
+                <label for="seed" style="margin-bottom: 0.25rem; color: #3498db; font-weight: 500;">Random Seed</label>
+                <input type="number" v-model.number="config.seed" min="0" step="1" name="seed" id="seed" />
+              </div>
             </div>
           </details>
           <button class="train-btn" type="submit" :disabled="isTraining">
@@ -175,7 +196,7 @@ const config = ref({
   end_date: '2020-12-31',
   capital: 100000,
   tickers: 'AAPL',
-  indicators: ['macd', 'rsi_30', 'cci_30'],
+  indicators: [],
   buy_cost_pct: 0.001,
   sell_cost_pct: 0.001,
   hmax: 100,
@@ -363,7 +384,7 @@ onBeforeUnmount(() => {
   top: 0;
   background: linear-gradient(90deg, #41b883 0%, #3498db 100%);
   color: white;
-  padding: 2rem 1rem 1rem 1rem;
+  padding: 2rem 1rem 1rem 6rem;
   box-shadow: 0 2px 8px rgba(52,152,219,0.08);
   z-index: 10;
 }
@@ -413,6 +434,10 @@ onBeforeUnmount(() => {
   width: 20px;
   height: 20px;
   margin-left: 0.5rem;
+}
+.form-field-checkbox {
+  display: flex;
+  align-items: center;
 }
 /* Train button styles */
 .train-btn {
@@ -527,5 +552,54 @@ onBeforeUnmount(() => {
   background: #fffbe6;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(255,200,0,0.08);
+}
+/* Info bubble styles */
+.info-bubble {
+  display: inline-block;
+  position: relative;
+  margin-left: 8px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+.info-bubble svg {
+  transition: filter 0.2s;
+  filter: drop-shadow(0 1px 2px rgba(52,152,219,0.15));
+}
+.info-bubble:hover svg,
+.info-bubble:focus svg {
+  filter: drop-shadow(0 2px 6px rgba(52,152,219,0.25));
+}
+.info-tooltip {
+  display: none;
+  position: absolute;
+  left: 28px;
+  top: -8px;
+  background: #fff;
+  color: #222;
+  border: 1px solid #3498db;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 1em;
+  min-width: 220px;
+  max-width: 320px;
+  z-index: 100;
+  box-shadow: 0 4px 16px rgba(52,152,219,0.12);
+  opacity: 0;
+  transform: translateY(-6px) scale(0.98);
+  transition: opacity 0.2s, transform 0.2s;
+}
+.info-bubble:hover .info-tooltip,
+.info-bubble:focus .info-tooltip {
+  display: block;
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+.info-tooltip kbd {
+  background: #eaf6fb;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.95em;
+  border: 1px solid #b5d6ea;
+  font-family: inherit;
 }
 </style>
