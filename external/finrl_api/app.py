@@ -1,19 +1,44 @@
+
 from fastapi import FastAPI, Request, WebSocket
 import uvicorn
-import json
 from datetime import datetime
 import asyncio
 import queue
+from functools import partial
+from concurrent.futures import ThreadPoolExecutor
 from run_dummy_training import run_dummy_training
 from models import TrainRequest, TrainingStatus, current_status
 
+# Centralized PPO steps value
+PPO_TOTAL_STEPS = 2048
+
 app = FastAPI()
-
-# WebSocket connections store
 active_connections: list[WebSocket] = []
-
-# Status update queue
 status_queue = queue.Queue()
+
+# Helper function to build status dictionary
+def build_status(result, is_training=False, current_step=None, total_steps=None):
+    # Get actual values from result first, then use parameters, then fallback to default
+    actual_current_step = result.get("current_step") or current_step or PPO_TOTAL_STEPS
+    actual_total_steps = result.get("total_steps") or total_steps or PPO_TOTAL_STEPS
+    
+    return {
+        "is_training": is_training,
+        "current_step": actual_current_step,
+        "total_steps": actual_total_steps,
+        "portfolio_value": result.get("final_portfolio_value", 0),
+        "total_trades": result.get("total_trades", 0),
+        "returns": result.get("returns", 0),
+        "sharpe": result.get("sharpe", 0),
+        "device": result.get("device", "cpu"),
+        "evaluation_success": result.get("evaluation_success", False),
+        "metrics": {
+            "portfolio_value": result.get("final_portfolio_value", 0),
+            "total_trades": result.get("total_trades", 0),
+            "returns": result.get("returns", 0),
+            "sharpe": result.get("sharpe", 0)
+        }
+    }
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
@@ -58,12 +83,12 @@ async def train_rl(req: TrainRequest):
     if current_status.is_training:
         return {"status": "error", "message": "Training already in progress"}
     
-    print(f"Received training request: {req}")
+    # print(f"Received training request: {req}")
     
     # Update status to training
     current_status.is_training = True
     current_status.current_step = 0
-    current_status.total_steps = 2048  # From PPO params
+    current_status.total_steps = PPO_TOTAL_STEPS  # From PPO params
     current_status.last_update = datetime.now().isoformat()
     
     # Run training in a way that doesn't block WebSocket updates
@@ -101,43 +126,26 @@ async def train_rl(req: TrainRequest):
         
         # Create a ThreadPoolExecutor to run the training
         with ThreadPoolExecutor() as executor:
+            # Pass all fields from req as kwargs to run_dummy_training (Pydantic v2+)
             result = await asyncio.get_event_loop().run_in_executor(
                 executor,
-                partial(run_dummy_training, status_callback=status_callback_wrapper)
+                partial(run_dummy_training, status_callback=status_callback_wrapper, **req.model_dump())
             )
         
         # Update final status in current_status
         current_status.is_training = False
         current_status.last_update = datetime.now().isoformat()
-        if result.get("status") == "training complete":
-            print("Training complete, updating current_status with results:", result)
-            current_status.portfolio_value = result.get("final_portfolio_value", 0)
-            current_status.total_trades = result.get("total_trades", 0)
-            current_status.device = result.get("device", "cpu")
+        # if result.get("status") == "training complete":
+        #     print("Training complete, updating current_status with results:", result)
+        #     for k in ["final_portfolio_value", "total_trades", "device"]:
+        #         setattr(current_status, k if k != "final_portfolio_value" else "portfolio_value", result.get(k, 0 if k != "device" else "cpu"))
         
         # Send ONE final comprehensive status update with all metrics
         if result.get("status") == "training complete":
-            final_status = {
-                "is_training": False,
-                "current_step": 2048,
-                "total_steps": 2048,
-                "portfolio_value": result.get("final_portfolio_value", 0),
-                "total_trades": result.get("total_trades", 0),
-                "returns": result.get("returns", 0),
-                "sharpe": result.get("sharpe", 0),
-                "device": result.get("device", "cpu"),
-                "evaluation_success": result.get("evaluation_success", False),
-                "metrics": {
-                    "portfolio_value": result.get("final_portfolio_value", 0),
-                    "total_trades": result.get("total_trades", 0),
-                    "returns": result.get("returns", 0),
-                    "sharpe": result.get("sharpe", 0)
-                }
-            }
-            
-            print("Sending final comprehensive status update:", final_status)
+            # Now the result should contain the actual step counts
+            final_status = build_status(result, is_training=False)
+            # print("Sending final comprehensive status update:", final_status)
             status_queue.put(final_status)
-            
             # Give time for the message to be processed
             await asyncio.sleep(0.5)
         

@@ -1,5 +1,18 @@
+
+import os
+import pandas as pd
+import numpy as np
+import random
+import torch
 from stable_baselines3.common.callbacks import BaseCallback
-# ...existing code...
+from finrl_mod.finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
+from finrl_mod.finrl.agents.stablebaselines3.models import DRLAgent
+from finrl_mod.finrl.config import (
+    INDICATORS,
+    TRAINED_MODEL_DIR,
+    TENSORBOARD_LOG_DIR,
+    RESULTS_DIR,
+)
 
 # ProgressCallback for real-time training progress
 class ProgressCallback(BaseCallback):
@@ -22,74 +35,69 @@ class ProgressCallback(BaseCallback):
             if self.status_callback:
                 self.status_callback(status)
         return True
-# run_dummy_training.py
-import os
-import pandas as pd
-import numpy as np
-from finrl_mod.finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
-from finrl_mod.finrl.agents.stablebaselines3.models import DRLAgent
-from finrl_mod.finrl.config import (
-    INDICATORS,
-    TRAINED_MODEL_DIR,
-    TENSORBOARD_LOG_DIR,
-    RESULTS_DIR,
-)
+
+
+# Named constants for defaults
+DEFAULT_CAPITAL = 1e6
+DEFAULT_N_POINTS = 10
+DEFAULT_BUY_COST_PCT = 0.001
+DEFAULT_SELL_COST_PCT = 0.001
+DEFAULT_HMAX = 100
+DEFAULT_REWARD_SCALING = 1e-4
+DEFAULT_TOTAL_TIMESTEPS = 2048
+DEFAULT_ENT_COEF = 0.01
+DEFAULT_LEARNING_RATE = 0.00025
+DEFAULT_BATCH_SIZE = 64
 
 # Create necessary directories
-os.makedirs(TRAINED_MODEL_DIR, exist_ok=True)
-os.makedirs(TENSORBOARD_LOG_DIR, exist_ok=True)
-os.makedirs(RESULTS_DIR, exist_ok=True)
+for d in [TRAINED_MODEL_DIR, TENSORBOARD_LOG_DIR, RESULTS_DIR]:
+    os.makedirs(d, exist_ok=True)
 
 
 def run_dummy_training(status_callback=None, strategy='ppo', start_date='2020-01-01', end_date='2020-12-31', capital=1e6, **kwargs):
-    print("Training config received:", kwargs)
+    # print(f"Training config received: {kwargs}")
     # Set random seeds for reproducibility
     seed = kwargs.get("seed", 42)
-    import random
     np.random.seed(seed)
     random.seed(seed)
-    import torch
     try:
         torch.manual_seed(seed)
     except Exception:
         pass
-    # Step 1: Create synthetic dataset with all required indicators
-    n_points = 10
-    data = {
+    # Step 1: Create synthetic dataset with only requested indicators
+    n_points = kwargs.get("n_points", DEFAULT_N_POINTS)
+    indicators = kwargs.get("indicators", INDICATORS)
+    indicator_data = {ind: [0.5] * n_points for ind in indicators}
+    df_dict = {
         "date": pd.date_range(start_date, periods=n_points),
-        "tic": ["AAPL"] * n_points,
+        "tic": [kwargs.get("tickers", "AAPL")] * n_points,
         "open": np.linspace(100, 110, n_points),
         "high": np.linspace(101, 111, n_points),
         "low": np.linspace(99, 109, n_points),
         "close": np.linspace(100, 110, n_points),
         "volume": np.random.randint(1000000, 2000000, size=n_points),
-        "macd": [0.5] * n_points,
-        "boll_ub": [105] * n_points,
-        "boll_lb": [95] * n_points,
-        "rsi_30": [50] * n_points,
-        "cci_30": [100] * n_points,
-        "dx_30": [30] * n_points,
-        "close_30_sma": [100] * n_points,
-        "close_60_sma": [100] * n_points,
         "turbulence": [0] * n_points
     }
-    df = pd.DataFrame(data)
+    df_dict.update(indicator_data)
+    df = pd.DataFrame(df_dict)
 
     # Step 2: Create training environment
     stock_dimension = 1
-    state_space = (3 + len(INDICATORS)) * stock_dimension
+    # Add +1 for turbulence to match StockTradingEnv expectations
+    state_space = (3 + len(indicators) ) * stock_dimension
+    capital = kwargs.get("capital", capital if capital is not None else DEFAULT_CAPITAL)
     env_kwargs = {
-        "hmax": kwargs.get("hmax", 100),
+        "hmax": kwargs.get("hmax", DEFAULT_HMAX),
         "initial_amount": capital,
-        "buy_cost_pct": [kwargs.get("buy_cost_pct", 0.001)],
-        "sell_cost_pct": [kwargs.get("sell_cost_pct", 0.001)],
+        "buy_cost_pct": [kwargs.get("buy_cost_pct", DEFAULT_BUY_COST_PCT)],
+        "sell_cost_pct": [kwargs.get("sell_cost_pct", DEFAULT_SELL_COST_PCT)],
         "state_space": state_space,
         "stock_dim": stock_dimension,
-        "tech_indicator_list": kwargs.get("indicators", INDICATORS),
+        "tech_indicator_list": indicators,
         "action_space": stock_dimension,
-        "reward_scaling": kwargs.get("reward_scaling", 1e-4),
+        "reward_scaling": kwargs.get("reward_scaling", DEFAULT_REWARD_SCALING),
         "num_stock_shares": [0],
-        "turbulence_threshold": kwargs.get("turbulence_threshold", None),
+        "turbulence_threshold": kwargs.get("turbulence_threshold", 0.0),
         "risk_indicator_col": kwargs.get("risk_indicator_col", "turbulence"),
         "make_plots": kwargs.get("make_plots", False)
     }
@@ -99,19 +107,19 @@ def run_dummy_training(status_callback=None, strategy='ppo', start_date='2020-01
     try:
         requested_device = kwargs.get("device", "cpu")
         device = requested_device if requested_device == "cpu" or (requested_device == "cuda" and torch.cuda.is_available()) else "cpu"
-        print(f"Using device: {device}")
+        # print(f"Using device: {device}")
         PPO_PARAMS = {
-            "n_steps": kwargs.get("total_timesteps", 2048),
-            "ent_coef": kwargs.get("ent_coef", 0.01),
-            "learning_rate": kwargs.get("learning_rate", 0.00025),
-            "batch_size": kwargs.get("batch_size", 64),
+            "n_steps": kwargs.get("total_timesteps", DEFAULT_TOTAL_TIMESTEPS),
+            "ent_coef": kwargs.get("ent_coef", DEFAULT_ENT_COEF),
+            "learning_rate": kwargs.get("learning_rate", DEFAULT_LEARNING_RATE),
+            "batch_size": kwargs.get("batch_size", DEFAULT_BATCH_SIZE),
             "device": device
         }
         agent = DRLAgent(env=env_train)
         model = agent.get_model(strategy, policy=kwargs.get("policy", "MlpPolicy"))
         if device == "cuda":
             model.policy.to(device)
-        total_steps = kwargs.get("total_timesteps", 2048)
+        total_steps = kwargs.get("total_timesteps", DEFAULT_TOTAL_TIMESTEPS)
         # Use ProgressCallback for real-time progress updates
         verbose = int(kwargs.get("verbose", 0))
         progress_callback = ProgressCallback(status_callback, total_steps, verbose=verbose)
@@ -128,24 +136,24 @@ def run_dummy_training(status_callback=None, strategy='ppo', start_date='2020-01
         stats = {}
         if hasattr(model, 'env') and hasattr(model.env, 'envs'):
             env = model.env.envs[0]
-            if hasattr(env, 'asset_memory') and env.asset_memory:
-                final_portfolio_value = env.asset_memory[-1]
-                returns = (env.asset_memory[-1] - env.asset_memory[0]) / env.asset_memory[0] if env.asset_memory[0] != 0 else 0
-                if len(env.asset_memory) > 1:
-                    daily_returns = np.diff(env.asset_memory) / env.asset_memory[:-1]
-                    if np.std(daily_returns) > 0:
-                        sharpe = np.sqrt(252) * np.mean(daily_returns) / np.std(daily_returns)
-            if hasattr(env, 'trades'):
-                total_trades = env.trades
+            asset_memory = getattr(env, 'asset_memory', [])
+            total_trades = getattr(env, 'trades', 0)
+            final_portfolio_value = asset_memory[-1] if asset_memory else 0
+            returns = ((asset_memory[-1] - asset_memory[0]) / asset_memory[0]) if asset_memory and asset_memory[0] != 0 else 0
+            sharpe = 0
+            if asset_memory and len(asset_memory) > 1:
+                daily_returns = np.diff(asset_memory) / asset_memory[:-1]
+                if np.std(daily_returns) > 0:
+                    sharpe = np.sqrt(252) * np.mean(daily_returns) / np.std(daily_returns)
             stats = {
-                'total_trades': total_trades if total_trades is not None else 0,
-                'portfolio_value': final_portfolio_value if final_portfolio_value is not None else 0,
-                'returns': returns if returns is not None else 0,
-                'sharpe': sharpe if sharpe is not None else 0
+                'total_trades': total_trades,
+                'portfolio_value': final_portfolio_value,
+                'returns': returns,
+                'sharpe': sharpe
             }
-            print("\nTraining Statistics:")
-            for key, value in stats.items():
-                print(f"{key}: {value}")
+            # print("\nTraining Statistics:")
+            # for key, value in stats.items():
+            #     print(f"{key}: {value}")
         # Final status update
         if status_callback:
             status_callback({
@@ -160,13 +168,15 @@ def run_dummy_training(status_callback=None, strategy='ppo', start_date='2020-01
         return {
             "status": "training complete",
             "device": device,
-            "final_portfolio_value": final_portfolio_value if final_portfolio_value is not None else 0,
-            "total_trades": total_trades if total_trades is not None else 0,
-            "returns": returns if returns is not None else 0,
-            "sharpe": sharpe if sharpe is not None else 0
+            "final_portfolio_value": final_portfolio_value,
+            "total_trades": total_trades,
+            "returns": returns,
+            "sharpe": sharpe,
+            "current_step": total_steps,  # Add actual steps completed
+            "total_steps": total_steps    # Add total steps from training
         }
     except Exception as e:
         import traceback
-        print(f"Training error: {str(e)}")
+        # print(f"Training error: {str(e)}")
         traceback.print_exc()
         return {"status": "error", "message": str(e)}

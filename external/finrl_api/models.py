@@ -1,11 +1,29 @@
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List, Union
+from typing import Dict, List
 
 class TrainRequest(BaseModel):
     strategy: str
     start_date: str
     end_date: str
     capital: float
+    tickers: str
+    indicators: List[str]
+    buy_cost_pct: float
+    sell_cost_pct: float
+    hmax: int
+    reward_scaling: float
+    turbulence_threshold: float
+    risk_indicator_col: str
+    make_plots: bool
+    policy: str
+    learning_rate: float
+    batch_size: int
+    total_timesteps: int
+    ent_coef: float
+    device: str
+    save_model: bool
+    verbose: bool
+    seed: int
 
 class TrainingStatus(BaseModel):
     is_training: bool

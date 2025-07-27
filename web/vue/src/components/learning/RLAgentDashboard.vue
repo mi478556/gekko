@@ -9,7 +9,6 @@
       <section class="config-section card">
         <h2>Configuration</h2>
         <form @submit.prevent="startTraining" class="config-form">
-          <!-- ...existing code... -->
           <details open>
             <summary>Data & Environment</summary>
             <div class="form-row">
@@ -196,12 +195,12 @@ const config = ref({
   end_date: '2020-12-31',
   capital: 100000,
   tickers: 'AAPL',
-  indicators: [],
+  indicators: ['turbulence'],
   buy_cost_pct: 0.001,
   sell_cost_pct: 0.001,
   hmax: 100,
-  reward_scaling: 0.0001,
-  turbulence_threshold: 0,
+  reward_scaling: 1,
+  turbulence_threshold: 1000,
   risk_indicator_col: 'turbulence',
   make_plots: false,
   strategy: 'ppo',
@@ -217,7 +216,7 @@ const config = ref({
 });
 
 const indicatorOptions = [
-  'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30', 'close_30_sma', 'close_60_sma', 'turbulence'
+  'macd', 'boll_ub', 'boll_lb', 'rsi_30', 'cci_30', 'dx_30', 'close_30_sma', 'close_60_sma',
 ];
 const strategyOptions = ['ppo', 'a2c', 'ddpg', 'sac', 'td3'];
 const policyOptions = ['MlpPolicy', 'CnnPolicy'];
@@ -253,7 +252,7 @@ function formatPercentage(value) {
 async function startTraining() {
   // Basic client-side validation for required fields
   const requiredFields = [
-    'start_date', 'end_date', 'capital', 'tickers', 'indicators', 'buy_cost_pct', 'sell_cost_pct',
+    'start_date', 'end_date', 'capital', 'tickers', 'buy_cost_pct', 'sell_cost_pct',
     'hmax', 'reward_scaling', 'turbulence_threshold', 'risk_indicator_col', 'strategy', 'policy',
     'learning_rate', 'batch_size', 'total_timesteps', 'ent_coef', 'device', 'seed'
   ];
