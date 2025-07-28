@@ -5,7 +5,7 @@ import asyncio
 import queue
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
-from run_dummy_training import run_dummy_training
+from run_RL_training import run_RL_training
 from models import TrainRequest, TrainingStatus, current_status
 
 # Centralized PPO steps value
@@ -129,10 +129,10 @@ async def train_rl(req: TrainRequest):
         
         # Create a ThreadPoolExecutor to run the training
         with ThreadPoolExecutor() as executor:
-            # Pass all fields from req as kwargs to run_dummy_training (Pydantic v2+)
+            # Pass all fields from req as kwargs to run_RL_training (Pydantic v2+)
             result = await asyncio.get_event_loop().run_in_executor(
                 executor,
-                partial(run_dummy_training, status_callback=status_callback_wrapper, **req.model_dump())
+                partial(run_RL_training, status_callback=status_callback_wrapper, **req.model_dump())
             )
         
         # Update final status in current_status

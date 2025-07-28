@@ -54,7 +54,7 @@ for d in [TRAINED_MODEL_DIR, TENSORBOARD_LOG_DIR, RESULTS_DIR]:
     os.makedirs(d, exist_ok=True)
 
 
-def run_dummy_training(status_callback=None, strategy='ppo', start_date='2020-01-01', end_date='2020-12-31', capital=1e6, **kwargs):
+def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01', end_date='2020-12-31', capital=1e6, **kwargs):
     # print(f"Training config received: {kwargs}")
     # Set random seeds for reproducibility
     seed = kwargs.get("seed", 42)
