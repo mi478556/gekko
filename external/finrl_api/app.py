@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Request, WebSocket
 import uvicorn
 from datetime import datetime
@@ -82,9 +81,13 @@ async def read_root():
 async def train_rl(req: TrainRequest):
     if current_status.is_training:
         return {"status": "error", "message": "Training already in progress"}
-    
-    # print(f"Received training request: {req}")
-    
+
+    # Log received dataset info
+    dataset = getattr(req, 'dataset', None)
+    print("Received dataset for training:", dataset)
+    if dataset:
+        print(f"Dataset start date: {dataset.get('from')}, end date: {dataset.get('to')}")
+
     # Update status to training
     current_status.is_training = True
     current_status.current_step = 0

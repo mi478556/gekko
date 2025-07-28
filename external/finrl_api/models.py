@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Dict, List
+from typing import Dict, List, Any
 
 class TrainRequest(BaseModel):
     strategy: str
@@ -24,7 +24,8 @@ class TrainRequest(BaseModel):
     save_model: bool
     verbose: bool
     seed: int
-
+    dataset: Dict[str, Any]
+    
 class TrainingStatus(BaseModel):
     is_training: bool
     current_step: int = 0
