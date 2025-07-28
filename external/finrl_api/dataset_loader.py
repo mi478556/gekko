@@ -4,13 +4,19 @@ import numpy as np
 from datetime import datetime
 
 class GekkoDatasetLoader:
-    def __init__(self, db_path, dataset, indicators=None):
+    def __init__(self, db_path_or_none, dataset, indicators=None):
         """
-        db_path: path to Gekko SQLite database
-        dataset: dict with keys 'asset', 'currency', 'from', 'to'
+        db_path_or_none: ignored, kept for compatibility
+        dataset: dict with keys 'exchange', 'asset', 'currency', 'from', 'to'
         indicators: list of indicator names to calculate
         """
-        self.db_path = db_path
+        # Always construct db path relative to this file
+        import os
+        base_dir = os.path.dirname(os.path.abspath(__file__))
+        history_dir = os.path.abspath(os.path.join(base_dir, '..', '..', 'history'))
+        exchange = dataset.get('exchange', 'kraken')
+        db_filename = f"{exchange}_0.1.db"
+        self.db_path = os.path.join(history_dir, db_filename)
         self.asset = dataset['asset']
         self.currency = dataset['currency']
         self.start = self.iso_to_unix(dataset['from'])
@@ -26,16 +32,30 @@ class GekkoDatasetLoader:
 
     def load_ohlcv(self):
         conn = sqlite3.connect(self.db_path)
-        query = """
+        # Print available tables for debugging
+        try:
+            tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
+            print(f"Available tables in {self.db_path}: {[t[0] for t in tables]}")
+        except Exception as e:
+            print(f"Error listing tables: {e}")
+        # Construct table name for asset/currency pair
+        table_name = f"candles_{self.currency}_{self.asset}"
+        query = f"""
             SELECT start, open, high, low, close, volume
-            FROM candles
+            FROM {table_name}
             WHERE start >= ? AND start <= ?
             ORDER BY start ASC
         """
-        df = pd.read_sql(query, conn, params=(self.start, self.end))
+        try:
+            df = pd.read_sql(query, conn, params=(self.start, self.end))
+        except Exception as e:
+            print(f"Error querying table {table_name}: {e}")
+            conn.close()
+            raise
         conn.close()
         df['date'] = pd.to_datetime(df['start'], unit='s')
         df['tic'] = f"{self.asset}/{self.currency}"
+        print("Columns after SQL load:", df.columns.tolist())
         self.df = df
         return df
 
@@ -86,6 +106,7 @@ class GekkoDatasetLoader:
                 df['close_30_sma'] = df['close'].rolling(window=30).mean().fillna(0)
             if 'close_60_sma' in self.indicators:
                 df['close_60_sma'] = df['close'].rolling(window=60).mean().fillna(0)
+            print("Columns after indicator calculation:", df.columns.tolist())
         except Exception as e:
             print(f"Error calculating indicators: {e}")
         self.df = df
@@ -94,20 +115,36 @@ class GekkoDatasetLoader:
         df = self.df
         # Simple turbulence: rolling std of returns
         returns = df['close'].pct_change()
-        df['turbulence'] = returns.rolling(window=10).std().fillna(0)
+        # Avoid duplicate turbulence column
+        if 'turbulence' not in df.columns:
+            df['turbulence'] = returns.rolling(window=10).std().fillna(0)
+        else:
+            df['turbulence'] = returns.rolling(window=10).std().fillna(0)
+        print("Columns after turbulence calculation:", df.columns.tolist())
         self.df = df
 
     def get_formatted_dataframe(self):
         df = self.df.copy()
+        # Remove duplicate turbulence columns if present
+        cols = pd.Series(df.columns)
+        for col in cols[cols.duplicated()].unique():
+            df = df.loc[:,~df.columns.duplicated()]
+        print("Columns before formatting:", df.columns.tolist())
+        # Standardize date column to timezone-aware UTC
+        if 'date' in df.columns:
+            df['date'] = pd.to_datetime(df['date'], utc=True)
+        # Remove 'turbulence' from indicators to avoid duplicate columns
+        indicators = [ind for ind in self.indicators if ind != "turbulence"]
         # Ensure all required columns exist
         required_cols = [
             "date", "tic", "open", "high", "low", "close", "volume", "turbulence"
-        ] + self.indicators
+        ] + indicators
         for col in required_cols:
             if col not in df.columns:
                 df[col] = 0
         # Reorder columns
         df = df[required_cols]
+        print("Columns after formatting:", df.columns.tolist())
         return df
 
     def process(self):

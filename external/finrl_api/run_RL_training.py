@@ -1,4 +1,3 @@
-
 import os
 import pandas as pd
 import numpy as np
@@ -81,10 +80,34 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
     df_dict.update(indicator_data)
     df = pd.DataFrame(df_dict)
 
+    # Step 1b: Create real dataset using GekkoDatasetLoader and compare
+    from dataset_loader import GekkoDatasetLoader
+    db_path = kwargs.get("db_path", "history/kraken_0.1.db")
+    dataset = kwargs.get("dataset", {
+        "asset": kwargs.get("asset", "BTC"),
+        "currency": kwargs.get("currency", "USD"),
+        "from": start_date + "T00:00:00Z",
+        "to": end_date + "T23:59:59Z"
+    })
+    loader = GekkoDatasetLoader(db_path, dataset, indicators)
+    loader.process()
+    df_real = loader.get_formatted_dataframe()
+
+    # Compare synthetic and real DataFrames
+    print("Synthetic df shape:", df.shape)
+    print("Real df shape:", df_real.shape)
+    print("Synthetic df columns:", df.columns.tolist())
+    print("Real df columns:", df_real.columns.tolist())
+    print("Synthetic df head:\n", df.head())
+    print("Real df head:\n", df_real.head())
+    print("Synthetic df describe:\n", df.describe())
+    print("Real df describe:\n", df_real.describe())
+    
+
     # Step 2: Create training environment
     stock_dimension = 1
     # Add +1 for turbulence to match StockTradingEnv expectations
-    state_space = (3 + len(indicators) ) * stock_dimension
+    state_space = (3 + len(indicators)) * stock_dimension
     capital = kwargs.get("capital", capital if capital is not None else DEFAULT_CAPITAL)
     env_kwargs = {
         "hmax": kwargs.get("hmax", DEFAULT_HMAX),
@@ -101,7 +124,8 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
         "risk_indicator_col": kwargs.get("risk_indicator_col", "turbulence"),
         "make_plots": kwargs.get("make_plots", False)
     }
-    e_train = StockTradingEnv(df=df, **env_kwargs)
+    # Use real data for training
+    e_train = StockTradingEnv(df=df_real, **env_kwargs)
     env_train, _ = e_train.get_sb_env()
 
     try:
