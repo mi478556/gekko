@@ -6,7 +6,9 @@ import queue
 from functools import partial
 from concurrent.futures import ThreadPoolExecutor
 from run_RL_training import run_RL_training
+from run_RL_inference import run_RL_inference
 from models import TrainRequest, TrainingStatus, current_status
+import json
 
 # Centralized PPO steps value
 PPO_TOTAL_STEPS = 2048
@@ -38,6 +40,36 @@ def build_status(result, is_training=False, current_step=None, total_steps=None)
             "sharpe": result.get("sharpe", 0)
         }
     }
+
+# RL Inference WebSocket endpoint
+@app.websocket("/ws/inference")
+async def websocket_inference(websocket: WebSocket):
+    await websocket.accept()
+    try:
+        while True:
+            data = await websocket.receive_text()
+            try:
+                payload = json.loads(data)
+                candle = payload.get("candle")
+                strategy = payload.get("strategy", "ppo")
+                policy = payload.get("policy", "MlpPolicy")
+                device = payload.get("device", "cpu")
+                indicators = payload.get("indicators")
+                tickers = payload.get("tickers")
+                result = run_RL_inference(
+                    candle=candle,
+                    strategy=strategy,
+                    policy=policy,
+                    device=device,
+                    indicators=indicators,
+                    tickers=tickers
+                )
+                await websocket.send_text(json.dumps(result))
+            except Exception as e:
+                await websocket.send_text(json.dumps({"status": "error", "message": str(e)}))
+    except Exception as e:
+        print(f"WebSocket inference error: {e}")
+        await websocket.close()
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
