@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, WebSocket
+from starlette.websockets import WebSocketDisconnect
 import uvicorn
 from datetime import datetime
 import asyncio
@@ -45,6 +46,7 @@ def build_status(result, is_training=False, current_step=None, total_steps=None)
 @app.websocket("/ws/inference")
 async def websocket_inference(websocket: WebSocket):
     await websocket.accept()
+    print("WebSocket connection accepted")
     try:
         while True:
             data = await websocket.receive_text()
@@ -66,10 +68,19 @@ async def websocket_inference(websocket: WebSocket):
                 )
                 await websocket.send_text(json.dumps(result))
             except Exception as e:
+                import traceback
+                traceback.print_exc()
+                print(f"Error handling message: {e}")
                 await websocket.send_text(json.dumps({"status": "error", "message": str(e)}))
+    except WebSocketDisconnect:
+        print("INFO:   client-side  connection closed")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"WebSocket inference error: {e}")
-        await websocket.close()
+        # Do not call await websocket.close() here; connection is already closed
+    finally:
+        print("WebSocket connection closed")
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
