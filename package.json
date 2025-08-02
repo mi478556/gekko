@@ -9,13 +9,13 @@
     "TA",
     "finance"
   ],
-"scripts": {
-  "test": "./node_modules/.bin/mocha test/*.js --recursive test -u tdd --reporter spec",
-  "start": "node ./gekko --config config.js --ui",
-  "postinstall": "git submodule update --init --recursive",
-  "setup:rl": "bash external/setup_rl.sh",
-  "setup:rl:win": "external\\setup_rl.bat"
-},
+  "scripts": {
+    "test": "./node_modules/.bin/mocha test/*.js --recursive test -u tdd --reporter spec",
+    "start": "node ./gekko --config config.js --ui",
+    "postinstall": "git submodule update --init --recursive",
+    "setup:rl": "bash external/setup_rl.sh",
+    "setup:rl:win": "external\\setup_rl.bat"
+  },
   "author": "Mike van Rossum <mike@mvr.me>",
   "dependencies": {
     "@koa/cors": "^5.0.0",
@@ -45,6 +45,7 @@
     "semver": "7.6.2",
     "sqlite3": "^5.1.7",
     "stats-lite": "^2.2.0",
+    "sync-request": "^6.1.0",
     "tiny-promisify": "^1.0.0",
     "toml": "^3.0.0",
     "ws": "^8.17.0"

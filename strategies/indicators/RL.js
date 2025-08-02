@@ -1,47 +1,25 @@
 
-const WebSocket = require('ws');
+const request = require('sync-request');
 
-function RLInference(config) {
+function Indicator(config) {
   this.input = 'candle';
-  this.cache = [];
-  this.agentURL = config.agentURL || 'ws://127.0.0.1:5000/ws/inference';
-  this.initialized = false;
-
-  this.ws = new WebSocket(this.agentURL);
-
-  this.ws.on('open', () => {
-    this.initialized = true;
-    if (config.fullDataset && config.fullDataset.length) {
-      this.ws.send(JSON.stringify({ candle: config.fullDataset }));
-    }
-  });
-
-  this.ws.on('message', (data) => {
-    try {
-      const res = JSON.parse(data);
-      if (Array.isArray(res.actions)) {
-        this.cache = res.actions;
-      } else if (res.action !== undefined) {
-        this.result = res.action;
-      }
-    } catch (e) {
-      console.error('WebSocket message parse error:', e.message);
-    }
-  });
-
-  this.ws.on('error', (err) => {
-    console.error('WebSocket error:', err.message);
-  });
+  this.apiURL = config.apiURL || 'http://127.0.0.1:5000/api/inference';
+  this.result = 0;
 }
 
-RLInference.prototype.update = function(candle) {
-  if (!this.initialized) return;
-  if (this.cache.length) {
-    this.result = this.cache.shift();
-  } else {
-    this.ws.send(JSON.stringify({ candle: candle }));
-    this.result = 0;
+Indicator.prototype.update = function(candle) {
+  try {
+    const res = request('POST', this.apiURL, {
+      json: { candle: candle },
+      timeout: 10000 // 10 seconds
+    });
+    const data = JSON.parse(res.getBody('utf8'));
+    this.result = Array.isArray(data.actions) ? data.actions[0] : data.action;
+  } catch (e) {
+    console.error('Sync HTTP error:', e.message);
+    // Keep previous result on error
   }
+  return this.result;
 };
 
-module.exports = RLInference;
+module.exports = Indicator;
