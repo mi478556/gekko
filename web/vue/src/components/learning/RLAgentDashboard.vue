@@ -19,6 +19,15 @@
               <input type="text" v-model="config.tickers" placeholder="AAPL,MSFT,GOOG" name="tickers" />
             </div>
             <div class="form-row">
+              <label>Candle Size</label>
+              <input type="number" v-model.number="config.candle_size_value" min="1" step="1" style="max-width:80px;" />
+              <select v-model="config.candle_size_unit" style="max-width:120px;">
+                <option value="minutes">minutes</option>
+                <option value="hours">hours</option>
+                <option value="days">days</option>
+              </select>
+            </div>
+            <div class="form-row">
               <label>
                 Indicators
                 <span class="info-bubble" tabindex="0" aria-label="Indicator selection help">
@@ -208,7 +217,9 @@ const config = ref({
   device: 'cpu',
   save_model: false,
   verbose: false,
-  seed: 42
+  seed: 42,
+  candle_size_value: 1,
+  candle_size_unit: 'hours'
 });
 
 const indicatorOptions = [
@@ -217,6 +228,14 @@ const indicatorOptions = [
 const strategyOptions = ['ppo', 'a2c', 'ddpg', 'sac', 'td3'];
 const policyOptions = ['MlpPolicy', 'CnnPolicy'];
 
+const candleSize = computed(() => {
+  const value = config.value.candle_size_value;
+  const unit = config.value.candle_size_unit;
+  if (unit === 'minutes') return value;
+  if (unit === 'hours') return value * 60;
+  if (unit === 'days') return value * 60 * 24;
+  return value;
+});
 const progressPercentage = computed(() => {
   if (!trainingStatus.value?.current_step || !trainingStatus.value?.total_steps) return 0;
   return Math.min(100, Math.round((trainingStatus.value.current_step / trainingStatus.value.total_steps) * 100));
@@ -276,7 +295,8 @@ async function startTraining() {
   const requiredFields = [
     'capital', 'tickers', 'buy_cost_pct', 'sell_cost_pct',
     'hmax', 'reward_scaling', 'turbulence_threshold', 'risk_indicator_col', 'strategy', 'policy',
-    'learning_rate', 'batch_size', 'total_timesteps', 'ent_coef', 'device', 'seed'
+    'learning_rate', 'batch_size', 'total_timesteps', 'ent_coef', 'device', 'seed',
+    'candle_size_value', 'candle_size_unit'
   ];
   // Dataset must be selected
   if (!selectedDataset.value) {
@@ -302,7 +322,9 @@ async function startTraining() {
   await connectWebSocket();
   // Log the outgoing request for debugging
   console.log('Sending training request:', { dataset: selectedDataset.value, ...config.value });
-  post('train', { dataset: selectedDataset.value, ...config.value }, (err, response) => {
+  // Remove candle_size_value and candle_size_unit from config before sending
+  const { candle_size_value, candle_size_unit, ...restConfig } = config.value;
+  post('train', { dataset: selectedDataset.value, ...restConfig, candle_size: candleSize.value }, (err, response) => {
     if (err) {
       // Log error to console for debugging
       console.error('AJAX error:', err);

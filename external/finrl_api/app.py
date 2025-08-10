@@ -167,10 +167,6 @@ async def train_rl(req: TrainRequest):
         # Update final status in current_status
         current_status.is_training = False
         current_status.last_update = datetime.now().isoformat()
-        # if result.get("status") == "training complete":
-        #     print("Training complete, updating current_status with results:", result)
-        #     for k in ["final_portfolio_value", "total_trades", "device"]:
-        #         setattr(current_status, k if k != "final_portfolio_value" else "portfolio_value", result.get(k, 0 if k != "device" else "cpu"))
         
         # Send ONE final comprehensive status update with all metrics
         if result.get("status") == "training complete":
@@ -178,8 +174,6 @@ async def train_rl(req: TrainRequest):
             final_status = build_status(result, is_training=False)
             # print("Sending final comprehensive status update:", final_status)
             status_queue.put(final_status)
-            # Give time for the message to be processed
-            await asyncio.sleep(0.5)
         
         # Signal the processor to start shutdown
         keep_running = False

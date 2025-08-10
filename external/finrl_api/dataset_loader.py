@@ -4,6 +4,34 @@ import numpy as np
 from datetime import datetime
 
 class GekkoDatasetLoader:
+    def batch_candles(self, df, candle_size):
+        """
+        Batch 1-minute candles into N-minute candles.
+        Args:
+            df: DataFrame with 1-minute candles (must have start, open, high, low, close, volume)
+            candle_size: int, number of minutes per batched candle
+        Returns:
+            DataFrame with batched candles
+        """
+        if candle_size <= 1:
+            return df.copy()
+
+        df = df.sort_values('start').reset_index(drop=True)
+        group = (np.arange(len(df)) // candle_size)
+        batched = df.groupby(group).agg({
+            'start': 'first',
+            'open': 'first',
+            'high': 'max',
+            'low': 'min',
+            'close': 'last',
+            'volume': 'sum'
+        }).reset_index(drop=True)
+
+        if 'date' in df.columns:
+            batched['date'] = df.groupby(group)['date'].first().values
+        if 'tic' in df.columns:
+            batched['tic'] = df.groupby(group)['tic'].first().values
+        return batched
     def __init__(self, db_path_or_none, dataset, indicators=None):
         """
         db_path_or_none: ignored, kept for compatibility
@@ -23,6 +51,7 @@ class GekkoDatasetLoader:
         self.end = self.iso_to_unix(dataset['to'])
         self.indicators = indicators or []
         self.df = None
+        self.candle_size = dataset.get('candle_size', 1)
 
     @staticmethod
     def iso_to_unix(iso_str):
@@ -35,7 +64,6 @@ class GekkoDatasetLoader:
         # Print available tables for debugging
         try:
             tables = conn.execute("SELECT name FROM sqlite_master WHERE type='table';").fetchall()
-            print(f"Available tables in {self.db_path}: {[t[0] for t in tables]}")
         except Exception as e:
             print(f"Error listing tables: {e}")
         # Construct table name for asset/currency pair
@@ -55,9 +83,10 @@ class GekkoDatasetLoader:
         conn.close()
         df['date'] = pd.to_datetime(df['start'], unit='s')
         df['tic'] = f"{self.asset}/{self.currency}"
-        print("Columns after SQL load:", df.columns.tolist())
-        self.df = df
-        return df
+        # Batch candles if needed
+        batched_df = self.batch_candles(df, self.candle_size)
+        self.df = batched_df
+        return batched_df
 
     def calculate_indicators(self):
         df = self.df
@@ -106,7 +135,6 @@ class GekkoDatasetLoader:
                 df['close_30_sma'] = df['close'].rolling(window=30).mean().fillna(0)
             if 'close_60_sma' in self.indicators:
                 df['close_60_sma'] = df['close'].rolling(window=60).mean().fillna(0)
-            print("Columns after indicator calculation:", df.columns.tolist())
         except Exception as e:
             print(f"Error calculating indicators: {e}")
         self.df = df
@@ -129,7 +157,6 @@ class GekkoDatasetLoader:
         cols = pd.Series(df.columns)
         for col in cols[cols.duplicated()].unique():
             df = df.loc[:,~df.columns.duplicated()]
-        print("Columns before formatting:", df.columns.tolist())
         # Standardize date column to timezone-aware UTC
         if 'date' in df.columns:
             df['date'] = pd.to_datetime(df['date'], utc=True)
@@ -144,7 +171,6 @@ class GekkoDatasetLoader:
                 df[col] = 0
         # Reorder columns
         df = df[required_cols]
-        print("Columns after formatting:", df.columns.tolist())
         return df
 
     def process(self):

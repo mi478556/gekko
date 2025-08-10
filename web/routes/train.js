@@ -16,6 +16,11 @@ module.exports = async (ctx) => {
       ...(ctx.request.body || {})
     };
 
+    // Ensure candle_size is inside the dataset object
+    if (payload.candle_size && payload.dataset) {
+      payload.dataset.candle_size = payload.candle_size;
+    }
+
     console.log('Sending payload to RL API:', payload);
 
     // POST to the RL agent REST API
@@ -23,8 +28,16 @@ module.exports = async (ctx) => {
     
     console.log('API Response:', res.data);
     
+    // Handle error responses from RL API
+    if (res.data.status === 'error' || res.data.error || res.data.message) {
+      const errorMsg = res.data.error || res.data.message || 'Unknown error from RL API.';
+      console.error('RL API returned error:', errorMsg);
+      ctx.status = 500;
+      ctx.body = { error: errorMsg };
+      return;
+    }
     // Check if we have valid training results (not just the initial fallback values)
-    if (res.data.status === 'training complete' && res.data.evaluation_success) {
+    if (res.data.status === 'training complete' && (res.data.evaluation_success === undefined || res.data.evaluation_success)) {
       const response = {
         status: 'completed',
         final_portfolio_value: res.data.final_portfolio_value,

@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import random
 import torch
+from dataset_loader import GekkoDatasetLoader
 from stable_baselines3.common.callbacks import BaseCallback
 from finrl_mod.finrl.meta.env_stock_trading.env_stocktrading import StockTradingEnv
 from finrl_mod.finrl.agents.stablebaselines3.models import DRLAgent
@@ -54,7 +55,7 @@ for d in [TRAINED_MODEL_DIR, TENSORBOARD_LOG_DIR, RESULTS_DIR]:
 
 
 def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01', end_date='2020-12-31', capital=1e6, **kwargs):
-    # print(f"Training config received: {kwargs}")
+    
     # Set random seeds for reproducibility
     seed = kwargs.get("seed", 42)
     np.random.seed(seed)
@@ -63,25 +64,8 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
         torch.manual_seed(seed)
     except Exception:
         pass
-    # Step 1: Create synthetic dataset with only requested indicators
-    n_points = kwargs.get("n_points", DEFAULT_N_POINTS)
+    
     indicators = kwargs.get("indicators", INDICATORS)
-    indicator_data = {ind: [0.5] * n_points for ind in indicators}
-    df_dict = {
-        "date": pd.date_range(start_date, periods=n_points),
-        "tic": [kwargs.get("tickers", "AAPL")] * n_points,
-        "open": np.linspace(100, 110, n_points),
-        "high": np.linspace(101, 111, n_points),
-        "low": np.linspace(99, 109, n_points),
-        "close": np.linspace(100, 110, n_points),
-        "volume": np.random.randint(1000000, 2000000, size=n_points),
-        "turbulence": [0] * n_points
-    }
-    df_dict.update(indicator_data)
-    df = pd.DataFrame(df_dict)
-
-    # Step 1b: Create real dataset using GekkoDatasetLoader and compare
-    from dataset_loader import GekkoDatasetLoader
     db_path = kwargs.get("db_path", "history/kraken_0.1.db")
     dataset = kwargs.get("dataset", {
         "asset": kwargs.get("asset", "BTC"),
@@ -91,22 +75,10 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
     })
     loader = GekkoDatasetLoader(db_path, dataset, indicators)
     loader.process()
-    df_real = loader.get_formatted_dataframe()
+    training_df = loader.get_formatted_dataframe()    
 
-    # Compare synthetic and real DataFrames
-    print("Synthetic df shape:", df.shape)
-    print("Real df shape:", df_real.shape)
-    print("Synthetic df columns:", df.columns.tolist())
-    print("Real df columns:", df_real.columns.tolist())
-    print("Synthetic df head:\n", df.head())
-    print("Real df head:\n", df_real.head())
-    print("Synthetic df describe:\n", df.describe())
-    print("Real df describe:\n", df_real.describe())
-    
-
-    # Step 2: Create training environment
     stock_dimension = 1
-    # Add +1 for turbulence to match StockTradingEnv expectations
+    
     state_space = (3 + len(indicators)) * stock_dimension
     capital = kwargs.get("capital", capital if capital is not None else DEFAULT_CAPITAL)
     env_kwargs = {
@@ -124,25 +96,19 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
         "risk_indicator_col": kwargs.get("risk_indicator_col", "turbulence"),
         "make_plots": kwargs.get("make_plots", False)
     }
-    # Use real data for training
-    e_train = StockTradingEnv(df=df_real, **env_kwargs)
+    
+    e_train = StockTradingEnv(df=training_df, **env_kwargs)
     env_train, _ = e_train.get_sb_env()
 
     try:
-        requested_device = kwargs.get("device", "cpu")
-        device = requested_device if requested_device == "cpu" or (requested_device == "cuda" and torch.cuda.is_available()) else "cpu"
-        # print(f"Using device: {device}")
-        PPO_PARAMS = {
-            "n_steps": kwargs.get("total_timesteps", DEFAULT_TOTAL_TIMESTEPS),
-            "ent_coef": kwargs.get("ent_coef", DEFAULT_ENT_COEF),
-            "learning_rate": kwargs.get("learning_rate", DEFAULT_LEARNING_RATE),
-            "batch_size": kwargs.get("batch_size", DEFAULT_BATCH_SIZE),
-            "device": device
-        }
+        device = kwargs.get("device", "cpu")
+        print(f"Using device: {device}")
         agent = DRLAgent(env=env_train)
-        model = agent.get_model(strategy, policy=kwargs.get("policy", "MlpPolicy"))
-        if device == "cuda":
-            model.policy.to(device)
+        model = agent.get_model(
+            strategy,
+            policy=kwargs.get("policy", "MlpPolicy"),
+            model_kwargs={"device": device}
+        )
         total_steps = kwargs.get("total_timesteps", DEFAULT_TOTAL_TIMESTEPS)
         # Use ProgressCallback for real-time progress updates
         verbose = int(kwargs.get("verbose", 0))
@@ -175,9 +141,7 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
                 'returns': returns,
                 'sharpe': sharpe
             }
-            # print("\nTraining Statistics:")
-            # for key, value in stats.items():
-            #     print(f"{key}: {value}")
+            
         # Final status update
         if status_callback:
             status_callback({
@@ -201,6 +165,5 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
         }
     except Exception as e:
         import traceback
-        # print(f"Training error: {str(e)}")
         traceback.print_exc()
         return {"status": "error", "message": str(e)}

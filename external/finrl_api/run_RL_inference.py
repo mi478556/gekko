@@ -60,6 +60,11 @@ def run_RL_inference(candle=None, candles=None, indicators=None, tickers=None, s
         device = device if device == "cpu" or (device == "cuda" and torch.cuda.is_available()) else "cpu"
         input_candles = candles if candles is not None else candle
         df = preprocess_candles(input_candles, indicators, tickers)
+
+        # Get candle_size from kwargs (default to 1 if not provided)
+        candle_size = kwargs.get('candle_size', 1)
+        print(f"[RL Inference] Requested candle size: {candle_size} (DB is always 1-minute candles)")
+
         model = load_model(strategy, policy, device)
         # Only use columns present during training
         numeric_cols = ["open", "high", "low", "close"]
