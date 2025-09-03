@@ -128,6 +128,19 @@
                 <input type="number" v-model.number="config.seed" min="0" step="1" name="seed" id="seed" />
               </div>
             </div>
+              <!-- 🔽 NEW: Model name input -->
+              <div class="form-row">
+                <div style="display: flex; flex-direction: column; flex: 1; min-width: 200px;">
+                  <label for="model_name" style="margin-bottom: 0.25rem; color: #3498db; font-weight: 500;">Model Name</label>
+                  <input
+                    type="text"
+                    v-model="config.model_name"
+                    name="model_name"
+                    id="model_name"
+                    placeholder="Enter a name for the model"
+                  />
+                </div>
+              </div>
           </details>
           <button class="train-btn" type="submit" :disabled="isTraining">
             <span v-if="!isTraining"><span class="rocket">🚀</span> Train Model</span>
@@ -175,6 +188,30 @@
         </div>
       </section>
 
+      <!-- Models Section -->
+      <section class="models-section card">
+        <h2>Saved Models</h2>
+        <div v-if="isLoadingModels">Loading models...</div>
+        <div v-else-if="!models.length" class="no-models">No models found.</div>
+        <ul v-else class="model-list">
+          <li v-for="m in models" :key="m.name" class="model-item">
+            <div class="model-card">
+              <div class="model-info">
+                <strong>{{ m.name }}</strong>
+                <small v-if="m.timestamp"> ({{ m.timestamp }})</small>
+              </div>
+              <div class="model-actions">
+                <button @click="sendToBacktest(m.name)">Send to Backtest</button>
+                <button @click="deleteModel(m.name)">Delete</button>
+              </div>
+            </div>
+          </li>
+        </ul>
+        <div v-if="modelError" class="error-message">
+          <p class="error">{{ modelError }}</p>
+        </div>
+      </section>
+
       <section class="error-message card" v-if="error && error !== 'Training job started. Waiting for results...'">
         <p class="error">{{ error }}</p>
       </section>
@@ -184,16 +221,43 @@
 
 
 <script setup>
-import { ref, computed, onBeforeUnmount } from 'vue';
-import { post } from '../../tools/ajax';
+import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
+import { post, get } from '../../tools/ajax';
 import spinner from '../global/blockSpinner.vue';
 import datasetPicker from '../global/configbuilder/datasetpicker.vue';
+import crypto from 'crypto-js'; // if available in your setup
+import stringify from 'json-stable-stringify';
+
+async function hashConfig(configString) {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(configString);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(hashBuffer))
+    .map(b => b.toString(16).padStart(2, "0"))
+    .join("")
+    .slice(0, 8);
+}
+
+async function generateModelIdentifier(baseName, config) {
+  // Use stable serialization for nested objects/arrays
+  const configString = stringify(config);
+  const hash = await hashConfig(configString);
+  const now = new Date();
+  // Format as YYYYMMDD-HHMMSS for readability
+  const timestamp = now.toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
+  const safeBase = baseName && baseName.trim() ? baseName.trim().replace(/\s+/g, '_') : 'model';
+  return `${safeBase}_${hash}_${timestamp}`;
+}
 
 const isTraining = ref(false);
 const trainingStatus = ref(null);
 const trainingStats = ref({});
-const error = ref(null);
+const error = ref(null); // for training errors
+const trainingError = error; // alias for clarity
+const modelError = ref(null); // for model CRUD errors
 const ws = ref(null);
+const models = ref([]); // list of saved models
+const isLoadingModels = ref(false);
 
 const config = ref({
   start_date: '2020-01-01',
@@ -219,7 +283,8 @@ const config = ref({
   verbose: false,
   seed: 42,
   candle_size_value: 1,
-  candle_size_unit: 'hours'
+  candle_size_unit: 'hours',
+  model_name: ''
 });
 
 const indicatorOptions = [
@@ -300,30 +365,36 @@ async function startTraining() {
   ];
   // Dataset must be selected
   if (!selectedDataset.value) {
-    error.value = 'Please select a dataset.';
+    trainingError.value = 'Please select a dataset.';
     return;
   }
   // Dates must be present in selected dataset
   if (!selectedDatasetDates.value.from || !selectedDatasetDates.value.to) {
-    error.value = 'Selected dataset does not have valid start/end dates.';
+    trainingError.value = 'Selected dataset does not have valid start/end dates.';
     return;
   }
   // Validate other required fields
   for (const field of requiredFields) {
     const value = config.value[field];
     if (value === undefined || value === null || value === '' || (Array.isArray(value) && value.length === 0)) {
-      error.value = `Please fill in the required field: ${field.replace(/_/g, ' ')}`;
+      trainingError.value = `Please fill in the required field: ${field.replace(/_/g, ' ')}`;
       return;
     }
   }
   isTraining.value = true;
-  error.value = null;
+  trainingError.value = null;
   trainingStats.value = {};
   await connectWebSocket();
   // Log the outgoing request for debugging
   console.log('Sending training request:', { dataset: selectedDataset.value, ...config.value });
   // Remove candle_size_value and candle_size_unit from config before sending
   const { candle_size_value, candle_size_unit, ...restConfig } = config.value;
+  // Generate model identifier if saving is enabled
+  let modelIdentifier = null;
+  if (config.value.save_model) {
+    modelIdentifier = await generateModelIdentifier(config.value.model_name, restConfig);
+    restConfig.model_identifier = modelIdentifier;
+  }
   post('train', { dataset: selectedDataset.value, ...restConfig, candle_size: candleSize.value }, (err, response) => {
     if (err) {
       // Log error to console for debugging
@@ -342,6 +413,7 @@ async function startTraining() {
         sharpe: response.sharpe
       };
       isTraining.value = false;
+      if (config.value.save_model) fetchModels();
     } else if (response && response.status === 'started') {
       // Show job started message if available
       error.value = 'Training job started. Waiting for results...';
@@ -402,23 +474,93 @@ function connectWebSocket() {
   });
 }
 
-async function checkTrainingStatus() {
+// async function checkTrainingStatus() {
+//   try {
+//     const response = await fetch('http://localhost:5000/api/status');
+//     const status = await response.json();
+//     if (!status.is_training && (status.portfolio_value || status.total_trades)) {
+//       trainingStats.value = {
+//         portfolio_value: status.portfolio_value || 0,
+//         total_trades: status.total_trades || 0,
+//         returns: status.returns || 0,
+//         sharpe: status.sharpe || null
+//       };
+//       isTraining.value = false;
+//     }
+//   } catch (err) {
+//     // ignore
+//   }
+// }
+
+// Fetch models from backend
+async function fetchModels() {
+  isLoadingModels.value = true;
+  modelError.value = null;
+
   try {
-    const response = await fetch('http://localhost:5000/api/status');
-    const status = await response.json();
-    if (!status.is_training && (status.portfolio_value || status.total_trades)) {
-      trainingStats.value = {
-        portfolio_value: status.portfolio_value || 0,
-        total_trades: status.total_trades || 0,
-        returns: status.returns || 0,
-        sharpe: status.sharpe || null
-      };
-      isTraining.value = false;
-    }
+    // Use your GET wrapper (or axios directly if no helper is set up)
+    get('models', (err, response) => {
+      if (err) {
+        console.error('AJAX error:', err);
+        modelError.value = 'Failed to fetch models list.';
+        return;
+      }
+
+      console.log('Models response:', response);
+
+      // Expecting an array of models
+      if (Array.isArray(response.models) || Array.isArray(response)) {
+        models.value = response.models || response;
+      } else {
+        modelError.value = 'Unexpected response format from backend.';
+      }
+    });
   } catch (err) {
-    // ignore
+    console.error('Failed to fetch models:', err);
+    modelError.value = 'Failed to fetch models list.';
+  } finally {
+    isLoadingModels.value = false;
   }
 }
+
+// Delete a model
+async function deleteModel(name) {
+  if (!confirm(`Delete model ${name}?`)) return;
+  try {
+    const response = await fetch(`http://localhost:5000/api/models/${name}`, {
+      method: 'DELETE'
+    });
+    if (response.ok) {
+      models.value = models.value.filter(m => m.name !== name);
+      modelError.value = null;
+    } else {
+      modelError.value = 'Failed to delete model.';
+    }
+  } catch (err) {
+    modelError.value = 'Error deleting model: ' + err.message;
+  }
+}
+
+// Send model to backtest
+async function sendToBacktest(name) {
+  try {
+    const response = await fetch(`http://localhost:5000/api/models/${name}/backtest`, {
+      method: 'POST'
+    });
+    if (!response.ok) {
+      modelError.value = 'Failed to send model to backtest.';
+    } else {
+      modelError.value = null;
+      console.log('Model sent to backtest:', name);
+    }
+  } catch (err) {
+    modelError.value = 'Error sending model to backtest: ' + err.message;
+  }
+}
+
+onMounted(() => {
+  fetchModels();
+});
 
 onBeforeUnmount(() => {
   if (ws.value) ws.value.close();
@@ -655,5 +797,56 @@ onBeforeUnmount(() => {
   font-size: 0.95em;
   border: 1px solid #b5d6ea;
   font-family: inherit;
+}
+/* Models Section Styles */
+.models-section {
+  margin-top: 2rem;
+}
+.model-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.model-item {
+  padding: 0.75rem 0;
+}
+.model-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+  box-shadow: 0 1px 4px rgba(52,152,219,0.07);
+  padding: 1rem 1.5rem;
+  margin-bottom: 0.5rem;
+}
+.model-info {
+  flex: 1;
+  font-size: 1.1em;
+  color: #34495e;
+}
+.model-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+.model-actions button {
+  padding: 0.4rem 0.9rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #3498db;
+  color: white;
+  font-size: 1em;
+  box-shadow: 0 1px 2px rgba(52,152,219,0.10);
+  transition: background 0.2s;
+}
+.model-actions button:hover {
+  background: #2980b9;
+}
+.no-models {
+  color: #888;
+  font-size: 1.1em;
+  text-align: center;
+  padding: 1.5rem 0;
 }
 </style>

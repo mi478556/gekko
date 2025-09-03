@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-module.exports = async (ctx) => {
+async function train(ctx) {
   try {
     // Provide defaults if any expected fields are missing
     const defaultPayload = {
@@ -68,3 +68,50 @@ module.exports = async (ctx) => {
     ctx.body = { error: 'Failed to start training job.' };
   }
 };
+
+async function list(ctx) {
+  try {
+    console.log('Requesting models list from RL API...');
+
+    // Call the FastAPI endpoint on port 5000
+    const res = await axios.get('http://127.0.0.1:5000/api/models');
+
+    console.log('API Response:', res.data);
+
+    // Respond back to frontend
+    ctx.body = {
+      status: 'success',
+      models: res.data
+    };
+  } catch (err) {
+    console.error('Error fetching models list:', err.message || err);
+    ctx.status = 500;
+    ctx.body = { error: 'Failed to fetch models list.' };
+  }
+};
+
+// Delete model handler
+async function remove(ctx) {
+  try {
+    const { name } = ctx.params; // from /api/models/:name
+
+    console.log(`Requesting model delete from RL API for: ${name}`);
+
+    const res = await axios.delete(`http://127.0.0.1:5000/api/models/${encodeURIComponent(name)}`);
+
+    console.log('Delete response:', res.data);
+
+    ctx.body = {
+      status: 'success',
+      ...res.data
+    };
+  } catch (err) {
+    console.error('Error deleting model:', err.message || err);
+    ctx.status = err.response?.status || 500;
+    ctx.body = {
+      error: err.response?.data?.detail || 'Failed to delete model.'
+    };
+  }
+}
+
+module.exports = { train, list, remove };
