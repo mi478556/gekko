@@ -228,23 +228,19 @@ import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
 import { post, get, del } from '../../tools/ajax';
 import spinner from '../global/blockSpinner.vue';
 import datasetPicker from '../global/configbuilder/datasetpicker.vue';
-import crypto from 'crypto-js'; // if available in your setup
+import CryptoJS from 'crypto-js'; // Use CryptoJS for hashing
 import stringify from 'json-stable-stringify';
 
-async function hashConfig(configString) {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(configString);
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map(b => b.toString(16).padStart(2, "0"))
-    .join("")
-    .slice(0, 8);
+function hashConfig(configString) {
+  // Use CryptoJS to hash the config string
+  const hash = CryptoJS.SHA256(configString).toString(CryptoJS.enc.Hex);
+  return hash.slice(0, 8); // Shorten for identifier
 }
 
-async function generateModelIdentifier(baseName, config) {
+function generateModelIdentifier(baseName, config) {
   // Use stable serialization for nested objects/arrays
   const configString = stringify(config);
-  const hash = await hashConfig(configString);
+  const hash = hashConfig(configString);
   const now = new Date();
   // Format as YYYYMMDD-HHMMSS for readability
   const timestamp = now.toISOString().replace(/[-:]/g, '').split('.')[0].replace('T', '-');
@@ -470,9 +466,8 @@ function connectWebSocket() {
     };
     ws.value.onclose = () => {
       if (isTraining.value) {
-        setTimeout(() => {
-          checkTrainingStatus();
-        }, 2000);
+        // Optionally, you can set an error or retry logic here
+        error.value = 'Training connection closed before completion.';
       }
     };
   });
