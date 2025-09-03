@@ -208,40 +208,43 @@ TRAINED_MODEL_DIR = os.path.join(os.path.dirname(__file__), 'trained_models')
 @app.get("/api/models")
 async def list_models():
     models = []
-    # Scan for zip files in TRAINED_MODEL_DIR
-    pattern = os.path.join(TRAINED_MODEL_DIR, '*.zip')
-    for file_path in glob.glob(pattern):
-        name = os.path.splitext(os.path.basename(file_path))[0]
-        # Try to extract timestamp from name (after last underscore)
-        parts = name.split('_')
-        timestamp = None
-        if len(parts) > 2:
-            ts_part = parts[-1]
-            # Try to parse YYYYMMDD-HHMMSS
-            try:
-                dt = datetime.strptime(ts_part, '%Y%m%d-%H%M%S')
-                timestamp = dt.isoformat() + 'Z'
-            except Exception:
+    # Scan for subfolders in TRAINED_MODEL_DIR
+    for folder_name in os.listdir(TRAINED_MODEL_DIR):
+        folder_path = os.path.join(TRAINED_MODEL_DIR, folder_name)
+        if os.path.isdir(folder_path):
+            # Look for zip and json files matching the folder name
+            zip_path = os.path.join(folder_path, f"{folder_name}.zip")
+            config_path = os.path.join(folder_path, f"{folder_name}.json")
+            if os.path.exists(zip_path):
+                # Extract timestamp from name (after last underscore)
+                parts = folder_name.split('_')
                 timestamp = None
-        models.append({
-            'name': name,
-            'timestamp': timestamp,
-            'path': file_path
-        })
+                if len(parts) > 2:
+                    ts_part = parts[-1]
+                    try:
+                        dt = datetime.strptime(ts_part, '%Y%m%d-%H%M%S')
+                        timestamp = dt.isoformat() + 'Z'
+                    except Exception:
+                        timestamp = None
+                models.append({
+                    'name': folder_name,
+                    'timestamp': timestamp,
+                    'path': zip_path,
+                    'config': config_path if os.path.exists(config_path) else None
+                })
     return JSONResponse(content=models)
 
 @app.delete("/api/models/{name}")
 async def delete_model(name: str):
-    # Find matching zip file
-    pattern = os.path.join(TRAINED_MODEL_DIR, f"{name}.zip")
-    files = glob.glob(pattern)
-    if not files:
+    # Find the model subfolder
+    folder_path = os.path.join(TRAINED_MODEL_DIR, name)
+    if not os.path.isdir(folder_path):
         raise HTTPException(status_code=404, detail="Model not found")
-    for file_path in files:
-        try:
-            os.remove(file_path)
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Error deleting model: {str(e)}")
+    try:
+        import shutil
+        shutil.rmtree(folder_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error deleting model: {str(e)}")
     return {"status": "deleted", "name": name}
 
 @app.post("/api/backtest_setup")
@@ -250,11 +253,12 @@ async def backtest_model(payload: dict):
     if not name:
         raise HTTPException(status_code=400, detail="Model name is required")
 
-    # Look for a matching .zip file
-    pattern = os.path.join(TRAINED_MODEL_DIR, f"{name}.zip")
-    files = glob.glob(pattern)
+    # Look for the model subfolder
+    folder_path = os.path.join(TRAINED_MODEL_DIR, name)
+    zip_path = os.path.join(folder_path, f"{name}.zip")
+    config_path = os.path.join(folder_path, f"{name}.json")
 
-    if not files:
+    if not os.path.exists(zip_path):
         raise HTTPException(status_code=404, detail=f"Model '{name}' not found")
 
     # Placeholder for future backtest logic
@@ -262,7 +266,9 @@ async def backtest_model(payload: dict):
     return JSONResponse(content={
         "status": "success",
         "message": f"Backtest setup for model '{name}' initiated. (placeholder)",
-        "model": name
+        "model": name,
+        "model_path": zip_path,
+        "config_path": config_path if os.path.exists(config_path) else None
     })
 
 if __name__ == "__main__":

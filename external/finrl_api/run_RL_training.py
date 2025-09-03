@@ -150,10 +150,44 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
                 "total_steps": total_steps,
                 "metrics": stats
             })
-        # Save model if requested, using model_identifier if provided
+        # Save model and config in a subfolder named after the model_identifier
         if kwargs.get("save_model", False):
             model_identifier = kwargs.get("model_identifier", "trained_model")
-            model.save(os.path.join(TRAINED_MODEL_DIR, f"{model_identifier}.zip"))
+            model_dir = os.path.join(TRAINED_MODEL_DIR, model_identifier)
+            os.makedirs(model_dir, exist_ok=True)
+            model_path = os.path.join(model_dir, f"{model_identifier}.zip")
+            config_path = os.path.join(model_dir, f"{model_identifier}.json")
+            model.save(model_path)
+            # Save config
+            import json
+            config_to_save = {
+                "model_identifier": model_identifier,
+                "strategy": strategy,
+                "policy": kwargs.get("policy", "MlpPolicy"),
+                "device": kwargs.get("device", "cpu"),
+                "learning_rate": kwargs.get("learning_rate", 0.00025),
+                "batch_size": kwargs.get("batch_size", 64),
+                "ent_coef": kwargs.get("ent_coef", 0.01),
+                "total_timesteps": kwargs.get("total_timesteps", 2048),
+                "seed": kwargs.get("seed", 42),
+                "indicators": kwargs.get("indicators", []),
+                "tickers": kwargs.get("tickers", ""),
+                "start_date": kwargs.get("start_date", ""),
+                "end_date": kwargs.get("end_date", ""),
+                "db_path": kwargs.get("db_path", ""),
+                "candle_size": kwargs.get("candle_size", None),
+                "dataset": kwargs.get("dataset", {}),
+                "capital": kwargs.get("capital", 100000),
+                "hmax": kwargs.get("hmax", 100),
+                "buy_cost_pct": kwargs.get("buy_cost_pct", 0.001),
+                "sell_cost_pct": kwargs.get("sell_cost_pct", 0.001),
+                "reward_scaling": kwargs.get("reward_scaling", 1),
+                "turbulence_threshold": kwargs.get("turbulence_threshold", 1000),
+                "risk_indicator_col": kwargs.get("risk_indicator_col", "turbulence"),
+                "make_plots": kwargs.get("make_plots", False)
+            }
+            with open(config_path, 'w') as f:
+                json.dump(config_to_save, f, indent=2)
         return {
             "status": "training complete",
             "device": device,
