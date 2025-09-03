@@ -114,4 +114,35 @@ async function remove(ctx) {
   }
 }
 
-module.exports = { train, list, remove };
+// Send model to backtest setup
+async function backtest_setup(ctx) {
+  try {
+    const { model } = ctx.request.body;
+
+    if (!model) {
+      ctx.status = 400;
+      ctx.body = { error: 'Model name is required.' };
+      return;
+    }
+
+    console.log(`Forwarding model ${model} to RL API backtest setup`);
+
+    // Forward request to FastAPI (assuming you have @app.post("/api/backtest"))
+    const res = await axios.post('http://127.0.0.1:5000/api/backtest_setup', { model });
+
+    console.log('Backtest setup response:', res.data);
+
+    ctx.body = {
+      status: 'success',
+      ...res.data
+    };
+  } catch (err) {
+    console.error('Error sending model to backtest:', err.message || err);
+    ctx.status = err.response?.status || 500;
+    ctx.body = {
+      error: err.response?.data?.detail || 'Failed to send model to backtest.'
+    };
+  }
+}
+
+module.exports = { train, list, remove, backtest_setup };

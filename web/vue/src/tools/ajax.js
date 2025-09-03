@@ -28,3 +28,10 @@ export const get = (to, next) => {
     .use(noCache)
     .end(processResponse(next));
 }
+
+export const del = (to, next) => {
+  superagent
+    .delete(restPath + to)
+    .use(noCache)
+    .end(processResponse(next));
+}

@@ -96,6 +96,7 @@ const trainRoutes = require(ROUTE('train'));
 router.post('/api/train', trainRoutes.train);
 router.get('/api/models', trainRoutes.list);
 router.delete('/api/models/:name', trainRoutes.remove);
+router.post('/api/backtest_setup', trainRoutes.backtest_setup);
 router.post('/api/startGekko', require(ROUTE('startGekko')));
 router.post('/api/stopGekko', require(ROUTE('stopGekko')));
 router.post('/api/deleteGekko', require(ROUTE('deleteGekko')));

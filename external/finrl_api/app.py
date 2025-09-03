@@ -244,5 +244,26 @@ async def delete_model(name: str):
             raise HTTPException(status_code=500, detail=f"Error deleting model: {str(e)}")
     return {"status": "deleted", "name": name}
 
+@app.post("/api/backtest_setup")
+async def backtest_model(payload: dict):
+    name = payload.get("model")
+    if not name:
+        raise HTTPException(status_code=400, detail="Model name is required")
+
+    # Look for a matching .zip file
+    pattern = os.path.join(TRAINED_MODEL_DIR, f"{name}.zip")
+    files = glob.glob(pattern)
+
+    if not files:
+        raise HTTPException(status_code=404, detail=f"Model '{name}' not found")
+
+    # Placeholder for future backtest logic
+    # TODO: Replace with actual backtest setup and job handling
+    return JSONResponse(content={
+        "status": "success",
+        "message": f"Backtest setup for model '{name}' initiated. (placeholder)",
+        "model": name
+    })
+
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)

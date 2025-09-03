@@ -210,6 +210,9 @@
         <div v-if="modelError" class="error-message">
           <p class="error">{{ modelError }}</p>
         </div>
+        <div v-if="backtestStatus" class="success-message">
+          <p>{{ backtestStatus }}</p>
+        </div>
       </section>
 
       <section class="error-message card" v-if="error && error !== 'Training job started. Waiting for results...'">
@@ -222,7 +225,7 @@
 
 <script setup>
 import { ref, computed, onBeforeUnmount, onMounted } from 'vue';
-import { post, get } from '../../tools/ajax';
+import { post, get, del } from '../../tools/ajax';
 import spinner from '../global/blockSpinner.vue';
 import datasetPicker from '../global/configbuilder/datasetpicker.vue';
 import crypto from 'crypto-js'; // if available in your setup
@@ -258,6 +261,7 @@ const modelError = ref(null); // for model CRUD errors
 const ws = ref(null);
 const models = ref([]); // list of saved models
 const isLoadingModels = ref(false);
+const backtestStatus = ref('');
 
 const config = ref({
   start_date: '2020-01-01',
@@ -474,24 +478,6 @@ function connectWebSocket() {
   });
 }
 
-// async function checkTrainingStatus() {
-//   try {
-//     const response = await fetch('http://localhost:5000/api/status');
-//     const status = await response.json();
-//     if (!status.is_training && (status.portfolio_value || status.total_trades)) {
-//       trainingStats.value = {
-//         portfolio_value: status.portfolio_value || 0,
-//         total_trades: status.total_trades || 0,
-//         returns: status.returns || 0,
-//         sharpe: status.sharpe || null
-//       };
-//       isTraining.value = false;
-//     }
-//   } catch (err) {
-//     // ignore
-//   }
-// }
-
 // Fetch models from backend
 async function fetchModels() {
   isLoadingModels.value = true;
@@ -525,35 +511,47 @@ async function fetchModels() {
 
 // Delete a model
 async function deleteModel(name) {
-  if (!confirm(`Delete model ${name}?`)) return;
   try {
-    const response = await fetch(`http://localhost:5000/api/models/${name}`, {
-      method: 'DELETE'
+    // Issue DELETE to wrapper route
+    del(`models/${encodeURIComponent(name)}`, (err, response) => {
+      if (err) {
+        console.error('Failed to delete model:', err);
+        modelError.value = 'Failed to delete model.';
+        return;
+      }
+      console.log('Delete response:', response);
+
+      // Auto-refresh model list after successful deletion
+      fetchModels();
     });
-    if (response.ok) {
-      models.value = models.value.filter(m => m.name !== name);
-      modelError.value = null;
-    } else {
-      modelError.value = 'Failed to delete model.';
-    }
   } catch (err) {
-    modelError.value = 'Error deleting model: ' + err.message;
+    console.error('Delete exception:', err);
+    modelError.value = 'Failed to delete model.';
   }
 }
 
 // Send model to backtest
 async function sendToBacktest(name) {
   try {
-    const response = await fetch(`http://localhost:5000/api/models/${name}/backtest`, {
-      method: 'POST'
+    // Call your Node wrapper route, e.g. POST /api/backtest
+    post('backtest_setup', { model: name }, (err, response) => {
+      if (err) {
+        console.error('Error sending model to backtest:', err);
+        modelError.value = 'Error sending model to backtest.';
+        return;
+      }
+
+      console.log('Backtest setup response:', response);
+
+      // Example: update UI with some status
+      if (response.status === 'success') {
+        backtestStatus.value = `Model ${name} is ready for backtest.`;
+      } else {
+        modelError.value = 'Unexpected response from backtest setup.';
+      }
     });
-    if (!response.ok) {
-      modelError.value = 'Failed to send model to backtest.';
-    } else {
-      modelError.value = null;
-      console.log('Model sent to backtest:', name);
-    }
   } catch (err) {
+    console.error('Backtest exception:', err);
     modelError.value = 'Error sending model to backtest: ' + err.message;
   }
 }
@@ -741,6 +739,13 @@ onBeforeUnmount(() => {
   background: #fdd;
   border-radius: 4px;
   color: #c00;
+}
+.success-message {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #d4edda;
+  border-radius: 4px;
+  color: #155724;
 }
 .legacy-dashboard {
   margin-top: 4rem;
