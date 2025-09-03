@@ -7,6 +7,7 @@
     "build": "vue-cli-service build"
   },
   "dependencies": {
+    "json-stable-stringify": "^1.3.0",
     "lodash": "^4.17.21",
     "marked": "^12.0.2",
     "mitt": "^3.0.1",
