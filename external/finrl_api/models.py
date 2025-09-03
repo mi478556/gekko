@@ -25,6 +25,7 @@ class TrainRequest(BaseModel):
     verbose: bool
     seed: int
     dataset: Dict[str, Any]
+    model_identifier: str = None
     
 class TrainingStatus(BaseModel):
     is_training: bool

@@ -150,9 +150,10 @@ def run_RL_training(status_callback=None, strategy='ppo', start_date='2020-01-01
                 "total_steps": total_steps,
                 "metrics": stats
             })
-        # Save model if requested
+        # Save model if requested, using model_identifier if provided
         if kwargs.get("save_model", False):
-            model.save(os.path.join(TRAINED_MODEL_DIR, "trained_model.zip"))
+            model_identifier = kwargs.get("model_identifier", "trained_model")
+            model.save(os.path.join(TRAINED_MODEL_DIR, f"{model_identifier}.zip"))
         return {
             "status": "training complete",
             "device": device,
