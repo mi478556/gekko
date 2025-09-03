@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI, Request, WebSocket, Body
 from starlette.websockets import WebSocketDisconnect
 import uvicorn
@@ -11,6 +10,10 @@ from run_RL_training import run_RL_training
 from run_RL_inference import run_RL_inference
 from models import TrainRequest, TrainingStatus, current_status
 import json
+from fastapi.responses import JSONResponse
+from fastapi import HTTPException
+import os
+import glob
 # Centralized PPO steps value
 PPO_TOTAL_STEPS = 2048
 
@@ -199,6 +202,47 @@ async def train_rl(req: TrainRequest):
 @app.get("/api/status")
 async def get_status():
     return current_status
+
+TRAINED_MODEL_DIR = os.path.join(os.path.dirname(__file__), 'trained_models')
+
+@app.get("/api/models")
+async def list_models():
+    models = []
+    # Scan for zip files in TRAINED_MODEL_DIR
+    pattern = os.path.join(TRAINED_MODEL_DIR, '*.zip')
+    for file_path in glob.glob(pattern):
+        name = os.path.splitext(os.path.basename(file_path))[0]
+        # Try to extract timestamp from name (after last underscore)
+        parts = name.split('_')
+        timestamp = None
+        if len(parts) > 2:
+            ts_part = parts[-1]
+            # Try to parse YYYYMMDD-HHMMSS
+            try:
+                dt = datetime.strptime(ts_part, '%Y%m%d-%H%M%S')
+                timestamp = dt.isoformat() + 'Z'
+            except Exception:
+                timestamp = None
+        models.append({
+            'name': name,
+            'timestamp': timestamp,
+            'path': file_path
+        })
+    return JSONResponse(content=models)
+
+@app.delete("/api/models/{name}")
+async def delete_model(name: str):
+    # Find matching zip file
+    pattern = os.path.join(TRAINED_MODEL_DIR, f"{name}.zip")
+    files = glob.glob(pattern)
+    if not files:
+        raise HTTPException(status_code=404, detail="Model not found")
+    for file_path in files:
+        try:
+            os.remove(file_path)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error deleting model: {str(e)}")
+    return {"status": "deleted", "name": name}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=5000)
